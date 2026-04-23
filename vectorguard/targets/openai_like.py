@@ -70,10 +70,6 @@ class OpenAILikeTarget(BaseTarget):
                 headers=self._build_headers(),
                 json=payload,
             )
-
-            print(response.status_code)
-            print(response.text)
-
             response.raise_for_status()
         latency_ms = (time.perf_counter() - start) * 1000
 
