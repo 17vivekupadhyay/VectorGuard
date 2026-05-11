@@ -29,24 +29,83 @@ def _format_result(result: dict[str, Any]) -> str:
         "```",
     ]
 
-    matched_patterns = result.get("matched_patterns", [])
-    if matched_patterns:
+    leak_matches = result.get("leak_matches", [])
+    if leak_matches:
         lines.extend(
             [
                 "",
-                f"- Matched Patterns: {matched_patterns}",
+                f"- Leak Matches: {leak_matches}",
             ]
         )
 
-    evidence = result.get("evidence", {})
-    if evidence:
-        lines.extend(["", "**Evidence**"])
-        for pattern, snippet in evidence.items():
+    refusal_signals = result.get("refusal_signals", [])
+    if refusal_signals:
+        lines.extend(
+            [
+                "",
+                f"- Refusal Signals: {refusal_signals}",
+            ]
+        )
+
+    other_matches = result.get("other_matches", [])
+    if other_matches:
+        lines.extend(
+            [
+                "",
+                f"- Other Matches: {other_matches}",
+            ]
+        )
+
+    leak_evidence = result.get("leak_evidence", {})
+    if leak_evidence:
+        lines.extend(["", "**Leak Evidence**"])
+        for pattern, snippet in leak_evidence.items():
             lines.extend(
                 [
                     f"- Pattern: `{pattern}`",
                     "```",
                     str(snippet),
+                    "```",
+                ]
+            )
+
+    refusal_evidence = result.get("refusal_evidence", {})
+    if refusal_evidence:
+        lines.extend(["", "**Refusal Evidence**"])
+        for pattern, snippet in refusal_evidence.items():
+            lines.extend(
+                [
+                    f"- Pattern: `{pattern}`",
+                    "```",
+                    str(snippet),
+                    "```",
+                ]
+            )
+
+    other_evidence = result.get("other_evidence", {})
+    if other_evidence:
+        lines.extend(["", "**Other Evidence**"])
+        for pattern, snippet in other_evidence.items():
+            lines.extend(
+                [
+                    f"- Pattern: `{pattern}`",
+                    "```",
+                    str(snippet),
+                    "```",
+                ]
+            )
+
+    transcript = result.get("transcript", [])
+    if transcript:
+        lines.extend(["", "**Transcript**"])
+        for message in transcript:
+            role = message.get("role", "unknown")
+            content = message.get("content", "")
+            lines.extend(
+                [
+                    f"- **{role}**",
+                    "```",
+                    str(content),
                     "```",
                 ]
             )
@@ -57,14 +116,32 @@ def _format_result(result: dict[str, Any]) -> str:
 def build_markdown_report(
     results: list[dict[str, Any]],
     summary: dict[str, Any],
+    metadata: dict[str, Any] | None = None,
     suite_name: str = "VectorGuard Run",
 ) -> str:
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+    metadata = metadata or {}
+
+    overall_verdict = (
+        "🟢 No leakage detected; refusal behavior observed where expected."
+        if summary.get("failed", 0) == 0
+        else "🔴 One or more tests failed; review leak evidence below."
+    )
 
     lines = [
         f"# {suite_name}",
         "",
         f"_Generated: {timestamp}_",
+        "",
+        "## Scan Metadata",
+        f"- Run ID: {metadata.get('run_id', 'unknown')}",
+        f"- Target Type: {metadata.get('target_type', 'unknown')}",
+        f"- Base URL: {metadata.get('base_url', 'unknown')}",
+        f"- Model: {metadata.get('model', 'unknown')}",
+        f"- Suite: {metadata.get('suite_name', 'unknown')}",
+        "",
+        "## Overall Verdict",
+        f"- {overall_verdict}",
         "",
         "## Summary",
         f"- Total tests: {summary.get('total', 0)}",
@@ -112,6 +189,7 @@ def build_markdown_report(
 def save_markdown_report(
     results: list[dict[str, Any]],
     summary: dict[str, Any],
+    metadata: dict[str, Any] | None = None,
     output_dir: str = "vectorguard/storage",
     suite_name: str = "VectorGuard Run",
 ) -> str:
@@ -123,6 +201,7 @@ def save_markdown_report(
     report_text = build_markdown_report(
         results=results,
         summary=summary,
+        metadata=metadata,
         suite_name=suite_name,
     )
 

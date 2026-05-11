@@ -14,7 +14,7 @@ class OpenAILikeTarget(BaseTarget):
         base_url: str,
         api_key: str,
         model: str,
-        timeout: float = 30.0,
+        timeout: float = 90.0,
         system_prompt: str | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
@@ -47,18 +47,19 @@ class OpenAILikeTarget(BaseTarget):
 
         return str(content)
 
-    def send_prompt(self, prompt: str) -> TargetResponse:
-        messages: list[dict[str, str]] = []
+    def send_messages(self, messages: list[dict[str, str]]) -> TargetResponse:
+        full_messages: list[dict[str, str]] = []
 
         if self.system_prompt:
-            messages.append({"role": "system", "content": self.system_prompt})
+            full_messages.append({"role": "system", "content": self.system_prompt})
 
-        messages.append({"role": "user", "content": prompt})
+        full_messages.extend(messages)
 
         payload = {
             "model": self.model,
-            "messages": messages,
+            "messages": full_messages,
             "temperature": 0,
+            "max_tokens": 300,
         }
 
         url = f"{self.base_url}/chat/completions"
@@ -70,16 +71,18 @@ class OpenAILikeTarget(BaseTarget):
                 headers=self._build_headers(),
                 json=payload,
             )
-            response.raise_for_status()
         latency_ms = (time.perf_counter() - start) * 1000
 
         response.raise_for_status()
         data = response.json()
         text = self._extract_text(data)
 
+        transcript = full_messages + [{"role": "assistant", "content": text}]
+
         return TargetResponse(
             text=text,
             status_code=response.status_code,
             latency_ms=latency_ms,
             raw=data,
+            transcript=transcript,
         )
