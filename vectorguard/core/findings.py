@@ -4,6 +4,49 @@ from typing import Any
 
 
 CATEGORY_FINDINGS: dict[str, dict[str, str]] = {
+        "rag_injection": {
+        "title": "RAG prompt injection protection failed",
+        "description": (
+            "The model appears to have followed instructions embedded inside retrieved "
+            "or untrusted context instead of treating that context as data."
+        ),
+        "recommendation": (
+            "Separate trusted instructions from retrieved content, wrap retrieved chunks "
+            "as untrusted data, filter retrieved documents for injection patterns, and "
+            "add explicit source-boundary checks before generation."
+        ),
+    },
+    "sensitive_information_disclosure": {
+        "title": "Sensitive information disclosure detected",
+        "description": (
+            "The model disclosed or appeared to disclose private, protected, or forbidden information."
+        ),
+        "recommendation": (
+            "Remove secrets from prompts and retrieval context, restrict runtime access, "
+            "and add data-loss prevention checks on model outputs."
+        ),
+    },
+    "system_prompt_leakage": {
+        "title": "System prompt or internal policy leakage detected",
+        "description": (
+            "The model appears to reveal hidden instructions, role rules, internal policy names, "
+            "or prompt template details."
+        ),
+        "recommendation": (
+            "Do not store secrets or sensitive operational details in model-visible prompts. "
+            "Move critical controls server-side and add output filtering for internal markers."
+        ),
+    },
+    "unbounded_consumption": {
+        "title": "Unbounded consumption risk detected",
+        "description": (
+            "The model appears vulnerable to requests that trigger excessive output, cost, "
+            "latency, or resource usage."
+        ),
+        "recommendation": (
+            "Enforce max token limits, request size limits, rate limits, timeouts, and batching controls."
+        ),
+    },
     "prompt_injection": {
         "title": "Prompt injection protection failed",
         "description": (

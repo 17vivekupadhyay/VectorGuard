@@ -10,6 +10,35 @@ import yaml
 PLACEHOLDER_RE = re.compile(r"\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}")
 
 
+class UniqueKeyLoader(yaml.SafeLoader):
+    pass
+
+
+def construct_mapping_no_duplicates(
+    loader: yaml.Loader,
+    node: yaml.Node,
+    deep: bool = False,
+) -> dict[Any, Any]:
+    mapping: dict[Any, Any] = {}
+
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+
+        if key in mapping:
+            raise ValueError(f"Duplicate YAML key found: {key}")
+
+        value = loader.construct_object(value_node, deep=deep)
+        mapping[key] = value
+
+    return mapping
+
+
+UniqueKeyLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+    construct_mapping_no_duplicates,
+)
+
+
 def load_yaml_file(path: str | Path) -> dict[str, Any]:
     file_path = Path(path)
 
@@ -17,20 +46,22 @@ def load_yaml_file(path: str | Path) -> dict[str, Any]:
         raise FileNotFoundError(f"Config file not found: {file_path}")
 
     with file_path.open("r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+        data = yaml.load(f, Loader=UniqueKeyLoader)
 
     if not isinstance(data, dict):
-        raise ValueError(f"Expected top-level mapping/object in config file: {file_path}")
+        raise ValueError(f"Expected top-level mapping/object in YAML file: {file_path}")
 
     return data
 
 
 def get_by_path(data: dict[str, Any], path: str) -> Any:
     current: Any = data
+
     for part in path.split("."):
         if not isinstance(current, dict) or part not in current:
             raise KeyError(f"Missing placeholder path: {path}")
         current = current[part]
+
     return current
 
 

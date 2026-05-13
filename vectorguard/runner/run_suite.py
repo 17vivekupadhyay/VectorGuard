@@ -5,7 +5,7 @@ from typing import Any
 
 import yaml
 
-from vectorguard.config.loader import resolve_string
+from vectorguard.config.loader import load_yaml_file, resolve_string
 from vectorguard.core.findings import build_finding
 from vectorguard.core.scoring import calculate_risk_score
 from vectorguard.evaluators.detectors import evaluate_response
@@ -36,8 +36,7 @@ def load_tests(test_file: str | Path) -> list[dict[str, Any]]:
     if not path.exists():
         raise FileNotFoundError(f"Test file not found: {path}")
 
-    with path.open("r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+    data = load_yaml_file(path)
 
     if not isinstance(data, dict):
         raise ValueError(f"Test file must contain a top-level mapping/object: {path}")
@@ -121,10 +120,17 @@ def validate_test_case(test: Any, *, index: int, path: Path) -> None:
 def infer_owasp_id(category: str) -> str:
     mapping = {
         "prompt_injection": "LLM01:2025",
+        "rag_injection": "LLM01:2025",
         "authority_spoofing": "LLM01:2025",
+
         "sensitive_data_disclosure": "LLM02:2025",
+        "sensitive_information_disclosure": "LLM02:2025",
         "indirect_leakage": "LLM02:2025",
+
         "prompt_leakage": "LLM07:2025",
+        "system_prompt_leakage": "LLM07:2025",
+
+        "unbounded_consumption": "LLM10:2025",
     }
 
     return mapping.get(category, "unmapped")

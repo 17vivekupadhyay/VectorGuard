@@ -1,0 +1,11 @@
+.env
+*.bak
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+
+vectorguard/storage/*
+!vectorguard/storage/.gitkeep
+
+vectorguard/tests/.tmp_*/

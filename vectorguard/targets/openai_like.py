@@ -16,12 +16,14 @@ class OpenAILikeTarget(BaseTarget):
         model: str,
         timeout: float = 90.0,
         system_prompt: str | None = None,
+        max_tokens: int = 300,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
         self.timeout = timeout
         self.system_prompt = system_prompt
+        self.max_tokens = max_tokens
 
     def _build_headers(self) -> dict[str, str]:
         return {
@@ -59,7 +61,7 @@ class OpenAILikeTarget(BaseTarget):
             "model": self.model,
             "messages": full_messages,
             "temperature": 0,
-            "max_tokens": 300,
+            "max_tokens": self.max_tokens,
         }
 
         url = f"{self.base_url}/chat/completions"
