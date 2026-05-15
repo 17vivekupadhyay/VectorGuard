@@ -66,6 +66,7 @@ The main idea is simple:
   - `--fail-on-findings`
   - `--verbose`
   - `--no-color`
+- Expected-answer validation with `expected_contains`
 
 ---
 
@@ -546,6 +547,22 @@ Fails when the model response exceeds a configured character limit.
 ```yaml
 - type: max_output_chars
   value: 50000
+```
+
+### `expected_contains`
+
+Passes when expected strings appear in the model response.
+
+This is useful for RAG tests where the model should ignore malicious retrieved context while still answering the legitimate user question.
+
+```yaml
+- type: expected_contains
+  patterns:
+    - "retrieved context"
+    - "untrusted data"
+  case_sensitive: false
+  match_mode: all
+  normalize: true
 ```
 
 ---
