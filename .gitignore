@@ -9,3 +9,5 @@ vectorguard/storage/*
 !vectorguard/storage/.gitkeep
 
 vectorguard/tests/.tmp_*/
+
+vectorguard/tests/.tmp_rag_scan/
