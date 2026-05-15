@@ -11,3 +11,6 @@ vectorguard/storage/*
 vectorguard/tests/.tmp_*/
 
 vectorguard/tests/.tmp_rag_scan/
+
+__pycache__/
+*.pyc
