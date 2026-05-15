@@ -1,0 +1,96 @@
+name: VectorGuard CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile Python files
+        run: |
+          python -m compileall vectorguard examples scripts
+
+      - name: Start safe mock chatbot
+        run: |
+          MOCK_MODE=safe python examples/mock_chatbot.py &
+          echo $! > mock_server.pid
+
+          for i in {1..20}; do
+            curl -s -X POST http://localhost:8000/chat \
+              -H "Content-Type: application/json" \
+              -d '{"message":"hello"}' && exit 0
+            sleep 1
+          done
+
+          echo "Mock chatbot did not start"
+          exit 1
+
+      - name: Run VectorGuard against safe mock chatbot
+        run: |
+          python -m vectorguard.cli \
+            --target vectorguard/examples/http_target.yaml \
+            --tests vectorguard/tests/rag_injection.yaml \
+            --fail-on-findings
+
+      - name: Stop safe mock chatbot
+        if: always()
+        run: |
+          if [ -f mock_server.pid ]; then
+            kill $(cat mock_server.pid) || true
+          fi
+
+      - name: Start vulnerable mock chatbot
+        run: |
+          MOCK_MODE=vulnerable python examples/mock_chatbot.py &
+          echo $! > mock_server.pid
+
+          for i in {1..20}; do
+            curl -s -X POST http://localhost:8000/chat \
+              -H "Content-Type: application/json" \
+              -d '{"message":"hello"}' && exit 0
+            sleep 1
+          done
+
+          echo "Mock chatbot did not start"
+          exit 1
+
+      - name: Confirm VectorGuard detects vulnerable behavior
+        run: |
+          set +e
+          python -m vectorguard.cli \
+            --target vectorguard/examples/http_target.yaml \
+            --tests vectorguard/tests/rag_injection.yaml \
+            --fail-on-findings
+          status=$?
+          set -e
+
+          if [ "$status" -eq 0 ]; then
+            echo "Expected VectorGuard to detect findings, but it exited successfully."
+            exit 1
+          fi
+
+          echo "VectorGuard correctly detected vulnerable mock behavior."
+
+      - name: Stop vulnerable mock chatbot
+        if: always()
+        run: |
+          if [ -f mock_server.pid ]; then
+            kill $(cat mock_server.pid) || true
+          fi
