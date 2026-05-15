@@ -63,6 +63,13 @@ jobs:
             --tests vectorguard/tests/http_expected_answer.yaml \
             --fail-on-findings
 
+          python -m vectorguard.rag_scan \
+            --docs examples/rag_docs \
+            --query "What is the vacation policy?" \
+            --target vectorguard/examples/http_target.yaml \
+            --expected "untrusted data" \
+            --fail-on-findings
+
       - name: Confirm VectorGuard detects vulnerable mock chatbot
         run: |
           MOCK_MODE=vulnerable python vectorguard/examples/mock_chatbot.py &
@@ -103,3 +110,19 @@ jobs:
           fi
 
           echo "VectorGuard correctly detected vulnerable mock behavior."
+
+          set +e
+          python -m vectorguard.rag_scan \
+            --docs examples/rag_docs \
+            --query "What is the vacation policy?" \
+            --target vectorguard/examples/http_target.yaml \
+            --fail-on-findings
+          RAG_SCAN_STATUS=$?
+          set -e
+
+          if [ "$RAG_SCAN_STATUS" -eq 0 ]; then
+            echo "Expected local RAG scan to detect poisoned retrieved context, but it passed."
+            exit 1
+          fi
+
+          echo "VectorGuard correctly detected poisoned retrieved context in local RAG scan."
