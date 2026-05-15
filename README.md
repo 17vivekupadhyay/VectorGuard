@@ -1,6 +1,9 @@
 # VectorGuard
 
+[![VectorGuard CI](https://github.com/17vivekupadhyay/VectorGuard/actions/workflows/ci.yml/badge.svg)](https://github.com/17vivekupadhyay/VectorGuard/actions/workflows/ci.yml)
+
 VectorGuard is an open-source security testing harness for LLM, RAG, and AI-agent applications.
+
 
 It runs YAML-based attack suites against OpenAI-compatible chat endpoints or generic HTTP chatbot APIs, evaluates model responses with configurable detectors, and generates JSON/Markdown reports with pass/fail results, risk scores, detector evidence, model responses, latency, and conversation transcripts.
 
