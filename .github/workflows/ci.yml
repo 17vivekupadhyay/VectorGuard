@@ -25,72 +25,76 @@ jobs:
 
       - name: Compile Python files
         run: |
-          python -m compileall vectorguard examples scripts
-
-      - name: Start safe mock chatbot
-        run: |
-          MOCK_MODE=safe python examples/mock_chatbot.py &
-          echo $! > mock_server.pid
-
-          for i in {1..20}; do
-            curl -s -X POST http://localhost:8000/chat \
-              -H "Content-Type: application/json" \
-              -d '{"message":"hello"}' && exit 0
-            sleep 1
-          done
-
-          echo "Mock chatbot did not start"
-          exit 1
+          python -m compileall vectorguard
 
       - name: Run VectorGuard against safe mock chatbot
         run: |
+          MOCK_MODE=safe python vectorguard/examples/mock_chatbot.py &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" || true
+          }
+          trap cleanup EXIT
+
+          READY=0
+          for i in {1..20}; do
+            if curl --fail --silent --show-error -X POST http://localhost:8000/chat \
+              -H "Content-Type: application/json" \
+              -d '{"message":"hello"}'; then
+              READY=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$READY" -ne 1 ]; then
+            echo "Safe mock chatbot did not start"
+            exit 1
+          fi
+
           python -m vectorguard.cli \
             --target vectorguard/examples/http_target.yaml \
             --tests vectorguard/tests/rag_injection.yaml \
             --fail-on-findings
 
-      - name: Stop safe mock chatbot
-        if: always()
+      - name: Confirm VectorGuard detects vulnerable mock chatbot
         run: |
-          if [ -f mock_server.pid ]; then
-            kill $(cat mock_server.pid) || true
-          fi
+          MOCK_MODE=vulnerable python vectorguard/examples/mock_chatbot.py &
+          SERVER_PID=$!
 
-      - name: Start vulnerable mock chatbot
-        run: |
-          MOCK_MODE=vulnerable python examples/mock_chatbot.py &
-          echo $! > mock_server.pid
+          cleanup() {
+            kill "$SERVER_PID" || true
+          }
+          trap cleanup EXIT
 
+          READY=0
           for i in {1..20}; do
-            curl -s -X POST http://localhost:8000/chat \
+            if curl --fail --silent --show-error -X POST http://localhost:8000/chat \
               -H "Content-Type: application/json" \
-              -d '{"message":"hello"}' && exit 0
+              -d '{"message":"hello"}'; then
+              READY=1
+              break
+            fi
             sleep 1
           done
 
-          echo "Mock chatbot did not start"
-          exit 1
+          if [ "$READY" -ne 1 ]; then
+            echo "Vulnerable mock chatbot did not start"
+            exit 1
+          fi
 
-      - name: Confirm VectorGuard detects vulnerable behavior
-        run: |
           set +e
           python -m vectorguard.cli \
             --target vectorguard/examples/http_target.yaml \
             --tests vectorguard/tests/rag_injection.yaml \
             --fail-on-findings
-          status=$?
+          STATUS=$?
           set -e
 
-          if [ "$status" -eq 0 ]; then
+          if [ "$STATUS" -eq 0 ]; then
             echo "Expected VectorGuard to detect findings, but it exited successfully."
             exit 1
           fi
 
           echo "VectorGuard correctly detected vulnerable mock behavior."
-
-      - name: Stop vulnerable mock chatbot
-        if: always()
-        run: |
-          if [ -f mock_server.pid ]; then
-            kill $(cat mock_server.pid) || true
-          fi
