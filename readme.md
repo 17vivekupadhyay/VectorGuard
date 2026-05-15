@@ -85,7 +85,7 @@ scripts/         # Helper scripts for running suites
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/VectorGuard.git
+git clone https://github.com/17vivekupadhyay/VectorGuard.git
 cd VectorGuard
 ```
 

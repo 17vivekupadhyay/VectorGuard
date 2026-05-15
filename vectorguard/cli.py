@@ -13,6 +13,7 @@ from vectorguard.reports.markdown import save_markdown_report
 from vectorguard.reports.summary import build_summary
 from vectorguard.runner.run_suite import run_suite
 from vectorguard.targets.openai_like import OpenAILikeTarget
+from vectorguard.targets.http_target import HTTPAppTarget
 
 try:
     from dotenv import load_dotenv
@@ -231,7 +232,7 @@ def build_target(
     *,
     config: dict[str, Any],
     args: argparse.Namespace,
-) -> OpenAILikeTarget:
+) -> BaseTarget:
     if "target" not in config:
         raise ValueError("Target config is missing required top-level key: target")
 
@@ -240,29 +241,49 @@ def build_target(
     if not isinstance(target_config, dict):
         raise ValueError("target must be a YAML object/mapping")
 
-    base_url = args.base_url or target_config.get("base_url")
-    model = args.model or target_config.get("model")
+    target_type = target_config.get("type", "openai_like")
 
-    if not base_url:
-        raise ValueError("Target config is missing target.base_url")
+    if target_type == "openai_like":
+        base_url = args.base_url or target_config.get("base_url")
+        model = args.model or target_config.get("model")
 
-    if not model:
-        raise ValueError("Target config is missing target.model")
+        if not base_url:
+            raise ValueError("Target config is missing target.base_url")
 
-    api_key = get_api_key(args, target_config)
-    system_prompt = build_system_prompt(config)
+        if not model:
+            raise ValueError("Target config is missing target.model")
 
-    timeout = float(target_config.get("timeout", 90.0))
-    max_tokens = int(target_config.get("max_tokens", 300))
+        api_key = get_api_key(args, target_config)
+        system_prompt = build_system_prompt(config)
 
-    return OpenAILikeTarget(
-        base_url=base_url,
-        api_key=api_key,
-        model=model,
-        timeout=timeout,
-        system_prompt=system_prompt,
-        max_tokens=max_tokens,
-    )
+        timeout = float(target_config.get("timeout", 90.0))
+        max_tokens = int(target_config.get("max_tokens", 300))
+
+        return OpenAILikeTarget(
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+            timeout=timeout,
+            system_prompt=system_prompt,
+            max_tokens=max_tokens,
+        )
+
+    if target_type == "http":
+        url = target_config.get("url")
+
+        if not url:
+            raise ValueError("HTTP target config is missing target.url")
+
+        return HTTPAppTarget(
+            url=url,
+            method=target_config.get("method", "POST"),
+            headers=target_config.get("headers", {"Content-Type": "application/json"}),
+            body_template=target_config.get("body_template", {"message": "{{prompt}}"}),
+            response_path=target_config.get("response_path"),
+            timeout=float(target_config.get("timeout", 90.0)),
+        )
+
+    raise ValueError(f"Unsupported target type: {target_type}")
 
 
 def build_metadata(
