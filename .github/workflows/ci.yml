@@ -58,6 +58,11 @@ jobs:
             --tests vectorguard/tests/rag_injection.yaml \
             --fail-on-findings
 
+          python -m vectorguard.cli \
+            --target vectorguard/examples/http_target.yaml \
+            --tests vectorguard/tests/http_expected_answer.yaml \
+            --fail-on-findings
+
       - name: Confirm VectorGuard detects vulnerable mock chatbot
         run: |
           MOCK_MODE=vulnerable python vectorguard/examples/mock_chatbot.py &
