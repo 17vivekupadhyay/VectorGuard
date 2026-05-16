@@ -814,6 +814,23 @@ If you accidentally leak an API key, rotate it immediately.
 
 ---
 
+## Troubleshooting
+
+New users may encounter various issues when setting up or running VectorGuard. This section provides solutions to common problems.
+
+### Common Issues:
+
+*   **Missing API key:** Ensure you have set the `VG_API_KEY` in your `.env` file. Refer to the "Environment Setup" section for details.
+*   **`.env` formatting problems:** The `.env` file should contain `KEY=VALUE` pairs without `export`, spaces around `=`, or shell syntax. For example, `VG_API_KEY=your_api_key_here` is correct, while `export VG_API_KEY = your_api_key_here` is incorrect.
+*   **HTTP target connection refused:** If you see a connection error for `localhost:8000`, make sure the mock chatbot is running. You can start it using: 
+    ```bash
+    MOCK_MODE=safe python3 vectorguard/examples/mock_chatbot.py
+    ```
+*   **Mock chatbot not running:** As above, ensure the mock chatbot is active if you are testing HTTP targets.
+*   **Flask missing from dependencies:** If you encounter errors related to Flask, ensure all dependencies are installed by running `pip install -r requirements.txt` within your virtual environment.
+*   **Generated reports not appearing:** Check the `vectorguard/storage/` directory for generated JSON and Markdown reports after a run.
+*   **Temporary RAG scan files showing up in `git status`:** These are temporary files. Ensure they are correctly ignored by your `.gitignore` file. If not, consider adding them or clearing your local changes.
+
 ## Current Limitations
 
 - Detectors are mostly pattern and regex based.
