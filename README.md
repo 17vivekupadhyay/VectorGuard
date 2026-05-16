@@ -222,6 +222,8 @@ python3 -m vectorguard.cli \
 
 ## Generic HTTP Chatbot Target
 
+For a detailed field-by-field guide to custom HTTP target configs, see [docs/http_targets.md](docs/http_targets.md).
+
 VectorGuard can also test any chatbot-style HTTP endpoint.
 
 This is useful when testing:
