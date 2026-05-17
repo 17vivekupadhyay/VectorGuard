@@ -618,6 +618,8 @@ In this example, leaking forbidden content fails the test. Refusal language is u
 
 ## Detector Types
 
+For more detector examples and option details, see [Detector Documentation](docs/detectors.md).
+
 ### `contains`
 
 Fails when forbidden strings appear in the model response.
