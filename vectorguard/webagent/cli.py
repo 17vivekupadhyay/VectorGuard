@@ -35,6 +35,14 @@ from .agent import (
     get_llm_client,
     plan_with_llm,
 )
+from .agent.report_agent import (
+    AISummaryUnavailableError,
+    FALLBACK_SUMMARY_MESSAGE,
+    generate_ai_summary,
+    load_scan_artifacts,
+    placeholder_summary_markdown,
+    save_agent_summary,
+)
 from .findings import build_findings_payload
 from .generator import generate_tests
 from .loader import WebTestValidationError, load_web_test
@@ -137,6 +145,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Allow gated state-changing POST tests (off by default).",
     )
+    scan_parser.add_argument(
+        "--ai-summary",
+        action="store_true",
+        help="Also write agent_summary.md (falls back to a placeholder without an LLM).",
+    )
     scan_parser.set_defaults(func=cmd_scan)
 
     # check
@@ -175,9 +188,37 @@ def build_parser() -> argparse.ArgumentParser:
         default="reports/web_scan",
         help="Scan output directory to render a report from.",
     )
+    report_parser.add_argument(
+        "--ai-summary",
+        action="store_true",
+        help="Also write agent_summary.md (falls back to a placeholder without an LLM).",
+    )
     report_parser.set_defaults(func=cmd_report)
 
     return parser
+
+
+def _maybe_write_ai_summary(out_path: Path) -> None:
+    """
+    Write agent_summary.md when --ai-summary is requested.
+
+    Never fails the caller: on a missing scan or an unavailable LLM client it
+    prints a helpful message and writes a placeholder summary instead.
+    """
+    try:
+        artifacts = load_scan_artifacts(out_path)
+    except FileNotFoundError as error:
+        print(f"AI summary skipped: {error}")
+        return
+
+    try:
+        text = generate_ai_summary(artifacts, client=get_llm_client())
+        summary_path = save_agent_summary(out_path, text)
+        print(f"\nAI summary written:\n  {summary_path}")
+    except AISummaryUnavailableError:
+        print(f"\n{FALLBACK_SUMMARY_MESSAGE}")
+        summary_path = save_agent_summary(out_path, placeholder_summary_markdown(artifacts))
+        print(f"Wrote placeholder summary:\n  {summary_path}")
 
 
 def _run_planner(config: dict, planner_mode: str) -> tuple[dict, str]:
@@ -490,6 +531,10 @@ def cmd_scan(args: argparse.Namespace) -> int:
     print("\nReports saved:")
     print(f"  {findings_path}")
     print(f"  {report_path}")
+
+    if args.ai_summary:
+        _maybe_write_ai_summary(out_path)
+
     return 0
 
 
@@ -554,6 +599,10 @@ def cmd_report(args: argparse.Namespace) -> int:
     report_path = save_report(out_path, report_text)
 
     print(f"  Regenerated: {report_path}")
+
+    if args.ai_summary:
+        _maybe_write_ai_summary(out_path)
+
     return 0
 
 
