@@ -1,0 +1,36 @@
+# Example VectorGuard Web Agent test (Phase 3 placeholder).
+#
+# This file exists so the skeleton CLI has something to reference in its
+# dry-run summary. The authoritative web test schema, loader, and validation
+# are added in Phase 5; field names may be refined then.
+#
+# Defensive use only: run against local labs, owned apps, or explicitly
+# authorized targets.
+
+id: forced_browsing_admin
+name: Forced browsing admin panel
+category: access_control
+owasp: A01-Broken-Access-Control
+severity: high
+safe: true
+requires_state_changing: false
+
+request:
+  method: GET
+  path: /admin
+  headers: {}
+  params: {}
+
+detectors:
+  - type: status_code
+    suspicious_if: 200
+  - type: body_contains_any
+    keywords:
+      - Admin
+      - administrator
+      - delete user
+
+remediation:
+  - Enforce server-side authorization on admin routes.
+  - Do not rely on hidden frontend links for access control.
+  - Apply deny-by-default authorization checks.

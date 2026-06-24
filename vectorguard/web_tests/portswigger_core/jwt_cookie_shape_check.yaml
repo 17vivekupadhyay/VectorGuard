@@ -1,0 +1,30 @@
+# PortSwigger-core template: JWT/session shape review (informational).
+#
+# Safe, read-only GET. Informational only: it flags JWT-looking tokens (the
+# "eyJ" base64url header prefix) appearing in a response. It performs NO JWT
+# tampering, signature stripping, or algorithm confusion in the MVP.
+# Inspired by: https://portswigger.net/web-security/jwt
+
+id: jwt_cookie_shape_check
+name: JWT/session shape review
+category: jwt_session_review
+owasp: A01-Broken-Access-Control / A07-Identification-and-Authentication-Failures
+severity: info
+safe: true
+requires_state_changing: false
+
+request:
+  method: GET
+  path: /my-account
+  headers: {}
+  params: {}
+
+detectors:
+  - type: body_contains_any
+    keywords:
+      - eyJ
+
+remediation:
+  - Validate JWT signature, expiration, issuer, and audience server-side.
+  - Reject "alg=none" and unexpected signing algorithms.
+  - Do not expose raw tokens in response bodies; scope and rotate session secrets.

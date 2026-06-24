@@ -1,0 +1,35 @@
+# PortSwigger-core template: missing CSRF token on a state-changing action.
+#
+# GATED: this is a state-changing POST. It validates but does NOT run in the
+# current GET-only, safe-mode runner. It is documented here for review and for
+# future POST support.
+# Inspired by:
+# https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/06-Session_Management_Testing/05-Testing_for_Cross_Site_Request_Forgery
+
+id: csrf_missing_token_check
+name: CSRF missing token on change-email
+category: csrf
+owasp: A01-Broken-Access-Control / CSRF
+severity: medium
+safe: false
+requires_state_changing: true
+
+request:
+  method: POST
+  path: /my-account/change-email
+  headers: {}
+  params: {}
+
+detectors:
+  - type: status_code
+    suspicious_if: 200
+  - type: body_not_contains_any
+    keywords:
+      - csrf
+      - csrf_token
+      - anti-forgery
+
+remediation:
+  - Require a per-session, unpredictable CSRF token on all state-changing requests.
+  - Set SameSite=Lax or Strict on session cookies.
+  - Validate the CSRF token server-side and reject requests without a valid token.

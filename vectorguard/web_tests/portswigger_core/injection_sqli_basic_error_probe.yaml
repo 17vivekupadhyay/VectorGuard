@@ -1,0 +1,38 @@
+# PortSwigger-core template: basic error-based SQL injection probe.
+# Safe and conservative: a single quote in one GET parameter to surface a
+# database error. No destructive payloads, no data extraction, no boolean/time
+# based blind techniques.
+# Inspired by: https://portswigger.net/web-security/sql-injection
+
+id: injection_sqli_basic_error_probe
+name: SQL injection basic error probe
+category: injection
+owasp: A03-Injection
+severity: high
+safe: true
+requires_state_changing: false
+
+request:
+  method: GET
+  path: /filter
+  headers: {}
+  params:
+    category: "'"
+
+detectors:
+  - type: status_code
+    suspicious_if: 500
+  - type: error_keywords
+    keywords:
+      - SQL syntax
+      - syntax error
+      - SQLSTATE
+      - unclosed quotation
+      - you have an error in your SQL
+      - ORA-
+      - psqlexception
+
+remediation:
+  - Use parameterized queries / prepared statements for all database access.
+  - Never build SQL by concatenating untrusted input.
+  - Return generic error pages and avoid leaking database errors to clients.

@@ -1,0 +1,16 @@
+# Example target config for the VectorGuard Web Agent deterministic planner.
+# Defensive use only: describes a LOCAL, owned, or explicitly authorized target.
+# The planner reads this and maps known endpoints to safe PortSwigger-core checks.
+
+target: http://localhost:5000
+scope:
+  - localhost
+description: "Shopping app with login, admin panel, product filter, account page, and change email flow."
+known_endpoints:
+  - /login
+  - /admin
+  - /filter?category=Gifts
+  - /my-account
+  - /my-account/change-email
+cookies:
+  - session

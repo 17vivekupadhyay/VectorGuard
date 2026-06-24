@@ -1,0 +1,32 @@
+# PortSwigger-core template: forced browsing of an admin panel.
+# Safe, read-only GET. Defensive use only (local labs / authorized targets).
+# Inspired by: https://portswigger.net/web-security/access-control
+
+id: access_control_forced_browsing_admin
+name: Forced browsing admin panel
+category: access_control
+owasp: A01-Broken-Access-Control
+severity: high
+safe: true
+requires_state_changing: false
+
+request:
+  method: GET
+  path: /admin
+  headers: {}
+  params: {}
+
+detectors:
+  - type: status_code
+    suspicious_if: 200
+  - type: body_contains_any
+    keywords:
+      - Admin
+      - administrator
+      - delete user
+      - user management
+
+remediation:
+  - Enforce server-side authorization on admin routes.
+  - Do not rely on hidden frontend links or obscurity for access control.
+  - Apply deny-by-default authorization checks for privileged endpoints.

@@ -8,6 +8,9 @@ venv/
 vectorguard/storage/*
 !vectorguard/storage/.gitkeep
 
+# Web Agent scan output (evidence, raw_results.json, findings.json, report.md)
+reports/
+
 vectorguard/tests/.tmp_*/
 
 vectorguard/tests/.tmp_rag_scan/

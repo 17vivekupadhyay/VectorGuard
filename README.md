@@ -14,6 +14,34 @@ VectorGuard also includes a local RAG scan mode that loads documents from disk, 
 
 ---
 
+## VectorGuard Web Agent
+
+VectorGuard also includes **VectorGuard Web Agent**, a defensive, authorized
+OWASP-style web application security testing layer inspired by PortSwigger labs.
+It maps known web surfaces to safe checks (planner → generated tests → scoped GET
+runner → evidence → detectors → findings → report), with an optional AI report
+summary. It is GET-only and safe-by-default today.
+
+A local, intentionally-vulnerable demo app lives under
+[`examples/web_demo_app/`](examples/web_demo_app/):
+
+```bash
+# Terminal 1
+python3 examples/web_demo_app/app.py
+
+# Terminal 2
+python3 -m vectorguard.webagent.cli scan \
+  --target http://localhost:5000 --scope localhost \
+  --tests vectorguard/web_tests/portswigger_core/access_control_forced_browsing_admin.yaml \
+  --out reports/web_demo
+```
+
+See **[docs/webagent.md](docs/webagent.md)** for the full guide: safety model,
+architecture, supported checks, output format, how to add templates, limitations,
+and roadmap.
+
+---
+
 ## Why VectorGuard?
 
 LLM applications can fail in subtle ways:

@@ -1,0 +1,24 @@
+# Intentionally INVALID web test, for demonstrating validation errors only.
+# Two deliberate problems:
+#   - severity is not one of info/low/medium/high/critical
+#   - request.path does not start with "/"
+# Kept under examples/ so it is never loaded as a real template.
+
+id: invalid_admin_check
+name: Invalid admin check example
+category: access_control
+owasp: A01-Broken-Access-Control
+severity: extreme
+safe: true
+requires_state_changing: false
+
+request:
+  method: GET
+  path: admin
+
+detectors:
+  - type: status_code
+    suspicious_if: 200
+
+remediation:
+  - This file is intentionally invalid and exists only for testing error messages.
