@@ -21,7 +21,8 @@ import argparse
 from pathlib import Path
 
 from .config import build_scan_options
-from .models import ScanOptions
+from .loader import WebTestValidationError, load_web_test
+from .models import ScanOptions, WebTest
 from .safety import MethodSafetyError, validate_method
 from .scope import ScopeError, validate_scope
 
@@ -154,9 +155,45 @@ def cmd_plan(args: argparse.Namespace) -> int:
 def cmd_validate(args: argparse.Namespace) -> int:
     print(DRY_RUN_NOTICE)
     print("Command: validate")
-    print(f"  Tests: {args.tests or '(none)'}")
-    print("Web test validation is not implemented yet (Phase 5). Nothing was executed.")
+
+    if not args.tests:
+        print("Error: A test file is required. Pass --tests <file.yaml>.")
+        return 2
+
+    test = load_web_test_or_report(args.tests)
+    if test is None:
+        return 2
+
+    print(f"  Tests: {args.tests}")
+    print_web_test_summary(test)
+    print("Valid web test.")
     return 0
+
+
+def load_web_test_or_report(tests_path: str) -> WebTest | None:
+    """Load and validate a web test, printing a helpful error on failure."""
+    try:
+        return load_web_test(tests_path)
+    except FileNotFoundError as error:
+        print(f"Error: {error}")
+    except WebTestValidationError as error:
+        print(f"Error: invalid web test - {error}")
+    except ValueError as error:
+        # Raised by the shared YAML loader (e.g. duplicate keys, non-mapping).
+        print(f"Error: could not parse YAML - {error}")
+    return None
+
+
+def print_web_test_summary(test: WebTest) -> None:
+    print(f"  id:       {test.id}")
+    print(f"  name:     {test.name}")
+    print(f"  category: {test.category}")
+    print(f"  owasp:    {test.owasp}")
+    print(f"  severity: {test.severity}")
+    print(f"  safe:     {test.safe}")
+    print(f"  requires_state_changing: {test.requires_state_changing}")
+    print(f"  request:  {test.request.method} {test.request.path}")
+    print(f"  detectors: {', '.join(d.type for d in test.detectors)}")
 
 
 def cmd_scan(args: argparse.Namespace) -> int:
@@ -182,10 +219,20 @@ def cmd_scan(args: argparse.Namespace) -> int:
         print(f"Error: {error}")
         return 2
 
+    # Validate the test file before doing anything else (Phase 5). Still no
+    # HTTP requests are sent.
+    test: WebTest | None = None
+    if options.tests:
+        test = load_web_test_or_report(options.tests)
+        if test is None:
+            return 2
+
     out_path = Path(options.out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
     print_scan_summary(options, out_path, host)
+    if test is not None:
+        print_web_test_summary(test)
     return 0
 
 
