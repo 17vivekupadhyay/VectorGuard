@@ -1,0 +1,13 @@
+# Target config for the local VectorGuard Web Agent demo app.
+# Defensive use only: this describes a LOCAL, owned, intentionally-vulnerable app.
+
+target: http://localhost:5000
+scope:
+  - localhost
+description: "Local intentionally vulnerable demo app for VectorGuard Web Agent."
+known_endpoints:
+  - /admin
+  - /filter?category=Gifts
+  - /my-account
+cookies:
+  - session
