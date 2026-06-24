@@ -29,6 +29,7 @@ from .config import build_scan_options
 from .detectors import WebDetectorError, evaluate_detectors, validate_detector_specs
 from .evidence import save_detector_results, save_evidence, save_raw_results
 from .findings import build_findings_payload
+from .generator import generate_tests
 from .loader import WebTestValidationError, load_web_test
 from .models import ScanOptions, WebTest
 from .planner import PlannerError, build_plan, load_target_config, save_plan
@@ -67,6 +68,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output directory for plan.json.",
     )
     plan_parser.set_defaults(func=cmd_plan)
+
+    # generate-tests
+    generate_parser = subparsers.add_parser(
+        "generate-tests",
+        help="Build the plan and write concrete YAML test files (no requests).",
+    )
+    generate_parser.add_argument(
+        "--config",
+        help="Path to a target config YAML (target, scope, known_endpoints, cookies).",
+    )
+    generate_parser.add_argument(
+        "--out",
+        default="reports/web_generated_tests",
+        help="Output directory for plan.json and generated_tests/.",
+    )
+    generate_parser.set_defaults(func=cmd_generate_tests)
 
     # validate
     validate_parser = subparsers.add_parser(
@@ -191,6 +208,46 @@ def cmd_plan(args: argparse.Namespace) -> int:
         print(f"  - {entry['template_id']}")
 
     print(f"\nPlan saved:\n  {plan_path}")
+    return 0
+
+
+def cmd_generate_tests(args: argparse.Namespace) -> int:
+    print(NO_HTTP_NOTICE)
+    print("Command: generate-tests")
+
+    if not args.config:
+        print("Error: generate-tests requires --config <target_config.yaml>.")
+        return 2
+
+    try:
+        config = load_target_config(args.config)
+        plan, written = generate_tests(
+            config,
+            config_path=args.config,
+            out_dir=args.out,
+        )
+    except FileNotFoundError as error:
+        print(f"Error: {error}")
+        return 2
+    except (PlannerError, ScopeError) as error:
+        print(f"Error: {error}")
+        return 2
+    except ValueError as error:
+        print(f"Error: could not parse config - {error}")
+        return 2
+
+    print(f"  Target: {plan['target']}")
+    print(f"  Output: {args.out}")
+
+    print(f"\nExecutable GET tests generated: {len(written['executable'])}")
+    for path in written["executable"]:
+        print(f"  {path}")
+
+    print(f"\nGated (state-changing) tests generated: {len(written['gated'])}")
+    for path in written["gated"]:
+        print(f"  {path}")
+
+    print(f"\nPlan saved:\n  {Path(args.out) / 'plan.json'}")
     return 0
 
 
