@@ -1,0 +1,34 @@
+# PortSwigger-core template: username enumeration via login responses.
+#
+# GATED: state-changing POST. Validates but does NOT run in the current
+# GET-only, safe-mode runner. Conservative by design: a single controlled login
+# attempt only. No brute force, no password spraying, no credential lists.
+# Inspired by: https://portswigger.net/web-security/authentication
+
+id: auth_username_enumeration
+name: Username enumeration via login responses
+category: authentication
+owasp: A07-Identification-and-Authentication-Failures
+severity: medium
+safe: false
+requires_state_changing: true
+
+request:
+  method: POST
+  path: /login
+  headers: {}
+  params: {}
+
+detectors:
+  - type: body_contains_any
+    keywords:
+      - invalid username
+      - user does not exist
+      - no such user
+      - unknown user
+      - account not found
+
+remediation:
+  - Return a single generic error for invalid username or password.
+  - Apply rate limiting and progressive delays on authentication endpoints.
+  - Design account lockout and monitoring that does not reveal account validity.
