@@ -31,6 +31,7 @@ from .evidence import save_detector_results, save_evidence, save_raw_results
 from .findings import build_findings_payload
 from .loader import WebTestValidationError, load_web_test
 from .models import ScanOptions, WebTest
+from .planner import PlannerError, build_plan, load_target_config, save_plan
 from .report import build_report_markdown, save_report
 from .runner import RunnerError, run_get_test
 from .safety import MethodSafetyError, validate_method
@@ -54,18 +55,16 @@ def build_parser() -> argparse.ArgumentParser:
     # plan
     plan_parser = subparsers.add_parser(
         "plan",
-        help="Plan which tests would run for a target (dry-run).",
+        help="Map a target config's endpoints to templates (no requests).",
     )
-    plan_parser.add_argument("--target", help="Target base URL, e.g. http://localhost:5000")
     plan_parser.add_argument(
-        "--scope",
-        action="append",
-        help="Allowed host (repeatable). Required before any real scan.",
+        "--config",
+        help="Path to a target config YAML (target, scope, known_endpoints, cookies).",
     )
     plan_parser.add_argument(
         "--out",
         default="reports/web_plan",
-        help="Output directory for the plan.",
+        help="Output directory for plan.json.",
     )
     plan_parser.set_defaults(func=cmd_plan)
 
@@ -154,10 +153,44 @@ def build_parser() -> argparse.ArgumentParser:
 def cmd_plan(args: argparse.Namespace) -> int:
     print(NO_HTTP_NOTICE)
     print("Command: plan")
-    print(f"  Target: {args.target or '(none)'}")
-    print(f"  Scope:  {args.scope or '(none)'}")
-    print(f"  Out:    {args.out}")
-    print("Planner is not implemented yet (Phase 10). Nothing was executed.")
+
+    if not args.config:
+        print("Error: plan requires --config <target_config.yaml>.")
+        return 2
+
+    try:
+        config = load_target_config(args.config)
+        plan = build_plan(config)
+    except FileNotFoundError as error:
+        print(f"Error: {error}")
+        return 2
+    except (PlannerError, ScopeError) as error:
+        print(f"Error: {error}")
+        return 2
+    except ValueError as error:
+        print(f"Error: could not parse config - {error}")
+        return 2
+
+    out_path = Path(args.out)
+    plan_path = save_plan(out_path, plan)
+
+    print(f"  Target:      {plan['target']}")
+    print(f"  Scope:       {', '.join(plan['scope'])}")
+    print(f"  Description: {plan['description']}")
+
+    print(f"\nSelected (executable now, GET): {len(plan['selected_tests'])}")
+    for entry in plan["selected_tests"]:
+        print(f"  - {entry['template_id']} ({entry['owasp']})")
+
+    print(f"\nGated (state-changing/POST, not run in safe mode): {len(plan['gated_tests'])}")
+    for entry in plan["gated_tests"]:
+        print(f"  - {entry['template_id']} ({entry['owasp']})")
+
+    print(f"\nSkipped (no matching signal): {len(plan['skipped_tests'])}")
+    for entry in plan["skipped_tests"]:
+        print(f"  - {entry['template_id']}")
+
+    print(f"\nPlan saved:\n  {plan_path}")
     return 0
 
 
