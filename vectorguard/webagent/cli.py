@@ -18,6 +18,9 @@ Subcommands:
 from __future__ import annotations
 
 import argparse
+import json
+import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -25,8 +28,10 @@ import httpx
 from .config import build_scan_options
 from .detectors import WebDetectorError, evaluate_detectors, validate_detector_specs
 from .evidence import save_detector_results, save_evidence, save_raw_results
+from .findings import build_findings_payload
 from .loader import WebTestValidationError, load_web_test
 from .models import ScanOptions, WebTest
+from .report import build_report_markdown, save_report
 from .runner import RunnerError, run_get_test
 from .safety import MethodSafetyError, validate_method
 from .scope import ScopeError, validate_scope
@@ -316,7 +321,47 @@ def cmd_scan(args: argparse.Namespace) -> int:
             f"(confidence={result['confidence']}) - {result['explanation']}"
         )
     print(f"\nDetector results saved:\n  {detector_results_path}")
-    print("\nFindings and reports are produced in Phase 8.")
+
+    # Build findings and a deterministic Markdown report (Phase 8).
+    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "_" + uuid.uuid4().hex[:8]
+    metadata = {
+        "run_id": run_id,
+        "generated": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "target": options.target,
+        "scope": options.scope,
+        "safety_mode": "safe" if options.safe_mode else "unsafe",
+        "allow_state_changing": options.allow_state_changing,
+        "tests_file": options.tests,
+        "out_dir": str(out_path),
+    }
+
+    findings_payload = build_findings_payload(
+        test=test,
+        raw_result=raw_result,
+        detector_results=detector_results,
+        metadata=metadata,
+    )
+    findings_path = out_path / "findings.json"
+    findings_path.write_text(json.dumps(findings_payload, indent=2), encoding="utf-8")
+
+    report_text = build_report_markdown(
+        metadata=metadata,
+        findings=findings_payload["findings"],
+        raw_results=[raw_result],
+        detector_results=[detector_payload],
+    )
+    report_path = save_report(out_path, report_text)
+
+    findings = findings_payload["findings"]
+    print(f"\nFindings: {len(findings)}")
+    for finding in findings:
+        print(
+            f"  - {finding['id']} ({finding['severity']}, "
+            f"confidence={finding['confidence']}, risk={finding['risk_score']})"
+        )
+    print("\nReports saved:")
+    print(f"  {findings_path}")
+    print(f"  {report_path}")
     return 0
 
 
@@ -352,8 +397,35 @@ def cmd_check(args: argparse.Namespace) -> int:
 def cmd_report(args: argparse.Namespace) -> int:
     print(NO_HTTP_NOTICE)
     print("Command: report")
-    print(f"  Out: {args.out}")
-    print("Report rendering is not implemented yet (Phase 8). Nothing was executed.")
+
+    out_path = Path(args.out)
+
+    def _load(name: str) -> dict | None:
+        path = out_path / name
+        if not path.exists():
+            print(f"Error: {path} not found. Run a scan first.")
+            return None
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    findings_payload = _load("findings.json")
+    raw_results_payload = _load("raw_results.json")
+    detector_results_payload = _load("detector_results.json")
+    if (
+        findings_payload is None
+        or raw_results_payload is None
+        or detector_results_payload is None
+    ):
+        return 2
+
+    report_text = build_report_markdown(
+        metadata=findings_payload.get("metadata", {}),
+        findings=findings_payload.get("findings", []),
+        raw_results=raw_results_payload.get("results", []),
+        detector_results=detector_results_payload.get("results", []),
+    )
+    report_path = save_report(out_path, report_text)
+
+    print(f"  Regenerated: {report_path}")
     return 0
 
 
