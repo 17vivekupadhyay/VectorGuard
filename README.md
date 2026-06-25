@@ -2,7 +2,7 @@
 
 [![VectorGuard CI](https://github.com/17vivekupadhyay/VectorGuard/actions/workflows/ci.yml/badge.svg)](https://github.com/17vivekupadhyay/VectorGuard/actions/workflows/ci.yml)
 
-VectorGuard is an open-source security testing harness for LLM, RAG, and AI-agent applications.
+VectorGuard is an open-source defensive security testing toolkit for LLM, RAG, and AI-agent applications, with a bounded Web Agent for authorized OWASP-style web application testing.
 
 
 It runs YAML-based attack suites against OpenAI-compatible chat endpoints or generic HTTP chatbot APIs, evaluates model responses with configurable detectors, and generates JSON/Markdown reports with pass/fail results, risk scores, detector evidence, model responses, latency, and conversation transcripts.
@@ -19,8 +19,22 @@ VectorGuard also includes a local RAG scan mode that loads documents from disk, 
 VectorGuard also includes **VectorGuard Web Agent**, a defensive, authorized
 OWASP-style web application security testing layer inspired by PortSwigger labs.
 It maps known web surfaces to safe checks (planner → generated tests → scoped GET
-runner → evidence → detectors → findings → report), with an optional AI report
-summary. It is GET-only and safe-by-default today.
+runner → evidence → detectors → findings → report). It is **GET-only and
+safe-by-default**: every scan requires a `--scope`, out-of-scope targets are
+blocked before any request, `POST` is blocked by default, and `PUT`/`PATCH`/
+`DELETE` are always blocked. Sensitive headers (auth, cookies, tokens) are
+redacted from saved evidence.
+
+It also runs as a **bounded agent**. The `agent` command drives an
+observe → decide → act loop: it observes each response, decides the next safe
+check, and stops on its own within a step cap. The decision step is grounded in a
+small built-in **RAG knowledge layer** (OWASP / PortSwigger notes) and can use an
+**optional LLM** whose output is strictly validated against real templates and
+known endpoints — with a deterministic fallback so the whole thing **runs with
+zero API keys**. Optional, bounded **same-origin endpoint discovery** lets it
+expand its surface within scope. Throughout, the agent only plans and explains;
+deterministic code executes every request and judges every finding, and every
+decision is written to an `agent_run.json` audit trace.
 
 A local, intentionally-vulnerable demo app lives under
 [`examples/web_demo_app/`](examples/web_demo_app/):
@@ -29,12 +43,22 @@ A local, intentionally-vulnerable demo app lives under
 # Terminal 1
 python3 examples/web_demo_app/app.py
 
-# Terminal 2
+# Terminal 2 - single safe check
 python3 -m vectorguard.webagent.cli scan \
   --target http://localhost:5000 --scope localhost \
   --tests vectorguard/web_tests/portswigger_core/access_control_forced_browsing_admin.yaml \
   --out reports/web_demo
+
+# Terminal 2 - bounded agent loop over a target config (deterministic by default)
+python3 -m vectorguard.webagent.cli agent \
+  --config examples/web_demo_app/webagent_target.yaml \
+  --out reports/web_agent_run
 ```
+
+The Web Agent CLI also supports `plan`, `generate-tests`, `validate`, and
+`check`. The `agent` and `plan` commands accept `--planner llm` (falls back to
+deterministic when no key is set), and `agent` accepts `--discover` and
+`--max-steps`.
 
 See **[docs/webagent.md](docs/webagent.md)** for the full guide: safety model,
 architecture, supported checks, output format, how to add templates, limitations,
@@ -865,6 +889,13 @@ New users may encounter various issues when setting up or running VectorGuard. T
 - Semantic leakage detection is not implemented yet.
 - OpenAI-compatible and generic HTTP chatbot targets are supported, but provider-specific adapters for Anthropic, Ollama, and other runtimes are not implemented yet.
 - Local RAG scan mode currently uses simple keyword retrieval, not embeddings.
+- The Web Agent is GET-only today; state-changing (POST) templates are planned
+  and gated, not executed.
+- The Web Agent's RAG knowledge layer also uses keyword retrieval, not embeddings.
+- The Web Agent's optional LLM planner/decision loop is validated and works; the
+  deterministic path is the default and is what runs end-to-end without a key.
+- Web Agent endpoint discovery is intentionally bounded (same-origin, capped, no
+  recursive crawling).
 - Passing tests does not prove that an AI application is secure.
 - Failed tests require human review to distinguish true vulnerabilities from false positives.
 
@@ -895,6 +926,15 @@ New users may encounter various issues when setting up or running VectorGuard. T
 - MCP-specific attack packs
 - Dashboard or report viewer
 - Historical scan comparison
+
+### Web Agent
+
+- Real LLM client smoke-tested against a live provider (currently mock-validated)
+- Embedding-based retrieval for the RAG knowledge layer
+- Safe POST support for local labs (currently gated)
+- Multi-user / IDOR access-control testing
+- Form and parameter discovery beyond same-origin links
+- Import OWASP / PortSwigger lab writeups into the knowledge layer
 
 ---
 
