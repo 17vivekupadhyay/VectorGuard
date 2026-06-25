@@ -22,7 +22,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .llm_planner import LLMClient, get_llm_client
+from .llm_planner import LLMClient, LLMUnavailableError, get_llm_client
 
 FALLBACK_SUMMARY_MESSAGE = (
     "AI summary unavailable; deterministic report.md was still generated."
@@ -105,7 +105,11 @@ def generate_ai_summary(
         raise AISummaryUnavailableError(FALLBACK_SUMMARY_MESSAGE)
 
     prompt = build_summary_prompt(artifacts)
-    return client.complete(prompt)
+    try:
+        return client.complete(prompt)
+    except LLMUnavailableError as error:
+        # A configured client that fails mid-call still falls back cleanly.
+        raise AISummaryUnavailableError(str(error))
 
 
 def _findings(artifacts: dict[str, Any]) -> list[dict[str, Any]]:

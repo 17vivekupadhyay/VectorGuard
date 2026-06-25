@@ -35,6 +35,11 @@ from .agent import (
     get_llm_client,
     plan_with_llm,
 )
+from .agent.agent_loop import (
+    DEFAULT_MAX_DISCOVERED,
+    DEFAULT_MAX_STEPS,
+    run_agent,
+)
 from .agent.report_agent import (
     AISummaryUnavailableError,
     FALLBACK_SUMMARY_MESSAGE,
@@ -105,6 +110,50 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output directory for plan.json and generated_tests/.",
     )
     generate_parser.set_defaults(func=cmd_generate_tests)
+
+    # agent
+    agent_parser = subparsers.add_parser(
+        "agent",
+        help="Run the bounded observe-decide-act agent loop over a target config.",
+    )
+    agent_parser.add_argument(
+        "--config",
+        help="Path to a target config YAML (target, scope, known_endpoints, cookies).",
+    )
+    agent_parser.add_argument(
+        "--planner",
+        choices=["deterministic", "llm"],
+        default="deterministic",
+        help="Decision strategy. Default: deterministic (LLM falls back to it).",
+    )
+    agent_parser.add_argument(
+        "--max-steps",
+        type=int,
+        default=DEFAULT_MAX_STEPS,
+        help=f"Maximum agent iterations (default: {DEFAULT_MAX_STEPS}).",
+    )
+    agent_parser.add_argument(
+        "--discover",
+        action="store_true",
+        help="Enable bounded same-origin endpoint discovery (off by default).",
+    )
+    agent_parser.add_argument(
+        "--max-discovered",
+        type=int,
+        default=DEFAULT_MAX_DISCOVERED,
+        help=f"Cap on discovered endpoints (default: {DEFAULT_MAX_DISCOVERED}).",
+    )
+    agent_parser.add_argument(
+        "--out",
+        default="reports/web_agent_run",
+        help="Output directory for evidence, findings, report, and agent_run.json.",
+    )
+    agent_parser.add_argument(
+        "--ai-summary",
+        action="store_true",
+        help="Also write agent_summary.md (falls back to a placeholder without an LLM).",
+    )
+    agent_parser.set_defaults(func=cmd_agent)
 
     # validate
     validate_parser = subparsers.add_parser(
@@ -327,6 +376,129 @@ def cmd_generate_tests(args: argparse.Namespace) -> int:
         print(f"  {path}")
 
     print(f"\nPlan saved:\n  {Path(args.out) / 'plan.json'}")
+    return 0
+
+
+def cmd_agent(args: argparse.Namespace) -> int:
+    print("Command: agent")
+
+    if not args.config:
+        print("Error: agent requires --config <target_config.yaml>.")
+        return 2
+
+    try:
+        config = load_target_config(args.config)
+    except FileNotFoundError as error:
+        print(f"Error: {error}")
+        return 2
+    except ValueError as error:
+        print(f"Error: could not parse config - {error}")
+        return 2
+
+    client = get_llm_client() if args.planner == "llm" else None
+    if args.planner == "llm" and client is None:
+        print(FALLBACK_MESSAGE)
+
+    out_path = Path(args.out)
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    try:
+        result = run_agent(
+            config,
+            out_dir=out_path,
+            client=client,
+            max_steps=args.max_steps,
+            discover=args.discover,
+            max_discovered=args.max_discovered,
+        )
+    except ScopeError as error:
+        print(f"Error: {error}")
+        return 2
+    except WebDetectorError as error:
+        print(f"Error: {error}")
+        return 2
+
+    trace = result["trace"]
+    raw_results = result["raw_results"]
+    detector_payloads = result["detector_payloads"]
+    findings = result["findings"]
+
+    raw_results_path = save_raw_results(out_path, raw_results)
+    detector_results_path = save_detector_results(out_path, detector_payloads)
+
+    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "_" + uuid.uuid4().hex[:8]
+    metadata = {
+        "run_id": run_id,
+        "generated": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "target": trace["target"],
+        "scope": trace["scope"],
+        "safety_mode": "safe",
+        "allow_state_changing": False,
+        "tests_file": f"agent loop ({trace['strategy']})",
+        "out_dir": str(out_path),
+    }
+
+    findings_path = out_path / "findings.json"
+    findings_path.write_text(
+        json.dumps({"metadata": metadata, "findings": findings}, indent=2),
+        encoding="utf-8",
+    )
+
+    report_text = build_report_markdown(
+        metadata=metadata,
+        findings=findings,
+        raw_results=raw_results,
+        detector_results=detector_payloads,
+    )
+    report_path = save_report(out_path, report_text)
+
+    agent_run_path = out_path / "agent_run.json"
+    agent_run_path.write_text(json.dumps(trace, indent=2), encoding="utf-8")
+
+    print(f"  Strategy:    {trace['strategy']}")
+    print(f"  Target:      {trace['target']}")
+    print(f"  Steps taken: {trace['steps_taken']} (cap {trace['max_steps']})")
+    print(f"  Stopped:     {trace['stopped_reason']}")
+    if trace.get("discovery_enabled"):
+        discovered = trace.get("discovered_endpoints", [])
+        print(f"  Discovered:  {len(discovered)} endpoint(s): {discovered}")
+
+    print("\nDecision trace:")
+    for entry in trace["steps"]:
+        decision = entry["decision"]
+        if decision["action"] == "stop":
+            print(f"  step {entry['step']}: STOP ({decision['reason']})")
+            continue
+        if "error" in entry:
+            print(f"  step {entry['step']}: {decision['template_id']} -> error: {entry['error']}")
+            continue
+        result_meta = entry["result"]
+        flag = "FINDING" if entry["finding_id"] else "clean"
+        disc = " (discovered)" if entry["action"].get("discovered") else ""
+        print(
+            f"  step {entry['step']}: [{decision['source']}] {decision['template_id']}"
+            f"{disc} ({entry['action']['path']}) "
+            f"-> {result_meta['status_code']} [{flag}] "
+            f"suspicious={result_meta['suspicious_detectors']}"
+        )
+
+    print(f"\nFindings: {len(findings)}")
+    for finding in findings:
+        print(
+            f"  - {finding['id']} ({finding['severity']}, "
+            f"confidence={finding['confidence']}, risk={finding['risk_score']})"
+        )
+
+    print("\nSaved:")
+    print(f"  {raw_results_path}")
+    print(f"  {detector_results_path}")
+    print(f"  {findings_path}")
+    print(f"  {report_path}")
+    print(f"  {agent_run_path}")
+
+    if args.ai_summary:
+        _maybe_write_ai_summary(out_path)
+
     return 0
 
 

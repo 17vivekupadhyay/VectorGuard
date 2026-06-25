@@ -1,10 +1,10 @@
 """
 Optional LLM planner interface for the VectorGuard Web Agent.
 
-No LLM client is wired into the web agent in this phase, so ``get_llm_client``
-returns ``None`` and ``plan_with_llm`` raises :class:`LLMUnavailableError`,
-prompting the CLI to fall back to the deterministic planner. The project works
-without any API keys.
+``get_llm_client`` builds a real OpenAI-compatible client from environment
+variables when an API key is configured, and returns ``None`` otherwise so the
+CLI falls back to the deterministic planner. The project still works without any
+API keys.
 
 The interface is intentionally small and mockable: a "client" is any object with
 a ``complete(prompt: str) -> str`` method returning JSON text. Output is parsed
@@ -58,13 +58,15 @@ def build_template_catalog(
 
 def get_llm_client() -> LLMClient | None:
     """
-    Return an LLM client for planning, or ``None`` if none is configured.
+    Return an LLM client, or ``None`` if none is configured.
 
-    The web agent does not wire a real client in this phase, so this returns
-    ``None`` and callers fall back to the deterministic planner. A future
-    integration can return a client implementing ``complete(prompt)``.
+    Builds a real OpenAI-compatible client from environment variables when an
+    API key is present; otherwise returns ``None`` so callers fall back to the
+    deterministic pipeline. The import is local to avoid a module import cycle.
     """
-    return None
+    from .llm_client import build_llm_client_from_env
+
+    return build_llm_client_from_env()
 
 
 def plan_with_llm(
@@ -88,15 +90,24 @@ def plan_with_llm(
 
     known_endpoints = [str(e) for e in (config.get("known_endpoints") or [])]
     cookies = [str(c) for c in (config.get("cookies") or [])]
+    description = config.get("description", "")
     catalog = build_template_catalog(templates_dir)
+
+    # Ground the plan in retrieved OWASP/PortSwigger guidance for this surface.
+    guidance = _retrieve_surface_guidance(
+        description=description,
+        known_endpoints=known_endpoints,
+        cookies=cookies,
+    )
 
     prompt = build_planner_prompt(
         target=str(target),
         scope=list(scope),
-        description=config.get("description", ""),
+        description=description,
         known_endpoints=known_endpoints,
         cookies=cookies,
         template_catalog=catalog,
+        guidance=guidance,
     )
 
     raw = client.complete(prompt)
@@ -114,6 +125,29 @@ def plan_with_llm(
     return {
         "target": str(target),
         "scope": list(scope),
-        "description": config.get("description", ""),
+        "description": description,
         **validated,
     }
+
+
+def _retrieve_surface_guidance(
+    *,
+    description: str,
+    known_endpoints: list[str],
+    cookies: list[str],
+) -> str:
+    """
+    Retrieve OWASP/PortSwigger guidance relevant to the surface.
+
+    Best-effort: any retrieval problem yields an empty guidance block so the
+    planner still works without the knowledge layer.
+    """
+    try:
+        from .knowledge import build_guidance_block, retrieve_guidance
+
+        query = " ".join([description, *known_endpoints, *cookies]).strip()
+        if not query:
+            return ""
+        return build_guidance_block(retrieve_guidance(query, top_k=5))
+    except Exception:
+        return ""
