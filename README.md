@@ -2,15 +2,85 @@
 
 [![VectorGuard CI](https://github.com/17vivekupadhyay/VectorGuard/actions/workflows/ci.yml/badge.svg)](https://github.com/17vivekupadhyay/VectorGuard/actions/workflows/ci.yml)
 
-VectorGuard is an open-source defensive security testing toolkit for LLM, RAG, and AI-agent applications, with a bounded Web Agent for authorized OWASP-style web application testing.
+VectorGuard is an open-source defensive security testing toolkit for LLM, RAG, and AI-agent applications, mapped to the OWASP LLM Top 10. It offers three ways to test, from a fixed regression harness to a fully autonomous attacker:
 
-
-It runs YAML-based attack suites against OpenAI-compatible chat endpoints or generic HTTP chatbot APIs, evaluates model responses with configurable detectors, and generates JSON/Markdown reports with pass/fail results, risk scores, detector evidence, model responses, latency, and conversation transcripts.
+1. **YAML attack suites** — repeatable, scripted black-box tests run against OpenAI-compatible chat endpoints or generic HTTP chatbot APIs, evaluated with configurable detectors and turned into JSON/Markdown reports (pass/fail, risk scores, detector evidence, model responses, latency, transcripts).
+2. **Autonomous red-team agent** — an attacker that pursues OWASP objectives on its own, adapts its tactics based on how the target responds, and escalates until it captures real proof of a vulnerability. It is *adaptive, not a script replayer*, and *proof-based, not a heuristic alerter*.
+3. **Web Agent** — a bounded, GET-only agent for authorized OWASP-style web application testing.
 
 VectorGuard also includes a local RAG scan mode that loads documents from disk, chunks them, retrieves relevant context, builds a RAG-style prompt, and tests whether the target follows malicious retrieved content.
 
-> **Status:** v1.5  
-> VectorGuard is a defensive testing aid. Passing VectorGuard tests does not prove that an AI system is secure, and failing tests should be treated as signals for further review.
+> **Status:** v2.0 — adds the Autonomous LLM Red-Team Agent  
+> VectorGuard is a defensive testing aid for systems you own or are explicitly authorized to test. Passing VectorGuard tests does not prove that an AI system is secure, and failing tests should be treated as signals for further review.
+
+---
+
+## Autonomous LLM Red-Team Agent
+
+VectorGuard includes an **autonomous red-team agent** that pentests a chatbot on
+its own. Unlike the YAML suites (which replay fixed prompts), the agent pursues
+**objectives** and adapts. For each objective it runs a bounded
+*observe → act → reflect* loop until it captures proof or exhausts its budget:
+
+1. **Propose** — an attacker "operator" generates the next attack payload.
+2. **Execute** — deterministic Python sends it and measures the response.
+3. **Capture** — a deterministic **oracle** decides whether real proof was
+   obtained (a planted flag, a credential matched by DLP/entropy, or a measured
+   token/latency budget breach), with an optional **LLM-as-judge** to catch
+   paraphrased or encoded wins.
+4. **Reflect** — an **analyst** scores progress, extracts reusable intel, and
+   recommends the next tactic, which feeds back into the next payload.
+
+This is what makes it an *attacker, not a scanner*: it keeps maneuvering against
+a single goal — escalating through tactics like persona/role-play, instruction
+override, encoding, payload splitting, and context flooding — and every finding
+ships with the **exact conversation that produced it** as the reproduction
+artifact.
+
+**Objectives (OWASP LLM Top 10):**
+
+| Objective | OWASP | Proof of capture |
+|---|---|---|
+| `system_prompt_leak` | LLM07 | a planted system-prompt marker is recovered |
+| `credential_exfil` | LLM02 | a planted secret, or any DLP/entropy-detected credential, is leaked |
+| `prompt_injection_obey` | LLM01 | the model follows an injected instruction (canary or judge-confirmed) |
+| `unbounded_consumption` | LLM10 | output exceeds a token / length / latency budget |
+
+**Safety-first by design** (same contract as the rest of VectorGuard): the LLM
+only *plans and generates*; deterministic Python *executes* and *judges capture*
+— the model never declares its own win. This milestone is **talk-only** (no tool
+execution, state changes, or corpus writes), **scope-locked** to an authorized
+host, and bounded by hard step and conversation-size caps.
+
+**Runs key-free.** The attacker brain, judge, and analyst all use an optional
+LLM loaded from environment variables. With no API key, the operator falls back
+to a deterministic escalation ladder and the analyst to deterministic
+heuristics — so the agent still adapts and captures without any external model.
+
+**Quickstart** against the bundled intentionally-vulnerable mock:
+
+```bash
+# Terminal 1 - start the local OpenAI-compatible vulnerable mock
+python3 -m vectorguard.examples.redteam_mock
+
+# Terminal 2 - run the autonomous campaign (any key value works; the mock ignores it)
+VG_API_KEY=local python3 -m vectorguard.redteam.cli attack \
+  --target vectorguard/examples/redteam_target.yaml \
+  --scope 127.0.0.1 \
+  --objectives all \
+  --max-steps 6 \
+  --out reports/redteam_run
+```
+
+This produces `reports/redteam_run/report.json` and `report.md` — a per-objective
+exploit report with captured proof, OWASP mapping, severity, and the full
+reproduction transcript. Use `--fail-on-capture` to exit non-zero in CI when any
+objective is captured, and `--objectives system_prompt_leak,credential_exfil` to
+scope the run.
+
+To point it at your own app, copy `vectorguard/examples/redteam_target.yaml`,
+set `base_url`/`model` to your endpoint, plant your own marker/secret via
+`--system-marker` / `--planted-secret`, and pass your host to `--scope`.
 
 ---
 
@@ -88,6 +158,14 @@ The main idea is simple:
 
 ## Current Features
 
+- **Autonomous LLM red-team agent**:
+  - objective-driven attacks mapped to the OWASP LLM Top 10
+  - adaptive observe → act → reflect loop (operator + analyst + capture oracle)
+  - proof-based capture (planted flags, DLP/entropy credential detection, token/latency budgets, optional LLM-as-judge)
+  - tactic escalation (persona, instruction override, encoding, payload splitting, context flooding)
+  - safe-by-default: talk-only, scope-locked, bounded step/size caps
+  - runs key-free with deterministic operator + analyst fallback
+  - exploit reports with full reproduction transcripts
 - YAML-based security test suites
 - OpenAI-compatible target adapter
 - Generic HTTP chatbot/API target adapter
@@ -139,13 +217,16 @@ vectorguard/
   config/        # Config loading and placeholder resolution
   core/          # Risk scoring and finding generation
   evaluators/    # Detector logic and pass/fail evaluation
-  examples/      # Example target configs and mock chatbot
+  examples/      # Example target configs and mock chatbots (incl. redteam_mock.py)
+  redteam/       # Autonomous LLM red-team agent (objectives, oracle, operator,
+                 #   analyst, episode loop, campaign, CLI)
   reports/       # JSON and Markdown report generation
   runner/        # Test loading and execution logic
   storage/       # Local saved reports and run artifacts
   targets/       # Target adapters
   tests/         # YAML attack suites
-  cli.py         # Main CLI entry point
+  webagent/      # Bounded, GET-only OWASP web application testing agent
+  cli.py         # Main CLI entry point (YAML suites)
   rag.py         # Local RAG document loading, chunking, and retrieval utilities
   rag_scan.py    # Local RAG scan CLI entry point
 
@@ -896,6 +977,10 @@ New users may encounter various issues when setting up or running VectorGuard. T
   deterministic path is the default and is what runs end-to-end without a key.
 - Web Agent endpoint discovery is intentionally bounded (same-origin, capped, no
   recursive crawling).
+- The red-team agent is **talk-only** today: tool-use (excessive agency) and RAG
+  corpus poisoning are not yet executed. Its LLM operator/judge/analyst paths are
+  validated with mock clients; the deterministic path is the default and runs
+  end-to-end without a key.
 - Passing tests does not prove that an AI application is secure.
 - Failed tests require human review to distinguish true vulnerabilities from false positives.
 
@@ -903,7 +988,9 @@ New users may encounter various issues when setting up or running VectorGuard. T
 
 ## Roadmap
 
-### v1.6 Reporting and CI Polish
+> **v2.0 (current)** introduced the Autonomous LLM Red-Team Agent.
+
+### v2.1 Reporting and CI Polish
 
 - Better CI artifacts for generated reports
 - More sample reports
@@ -911,7 +998,14 @@ New users may encounter various issues when setting up or running VectorGuard. T
 - More robust per-test timeout handling
 - SARIF report output for GitHub security workflows
 
-### v2.0 Retrieval and Provider Expansion
+### v2.2 Red-Team Agent Depth
+
+- Sandboxed tool execution to prove excessive agency (LLM06) without real damage
+- Closed-loop RAG corpus poisoning (inject → confirm retrieval → confirm effect)
+- Grey/white-box targets that expose retrieved chunks and tool-call traces
+- Live-provider validation of the LLM operator/judge/analyst paths
+
+### v2.5 Retrieval and Provider Expansion
 
 - Embedding-based RAG scan mode
 - Anthropic target adapter
@@ -927,7 +1021,7 @@ New users may encounter various issues when setting up or running VectorGuard. T
 - Dashboard or report viewer
 - Historical scan comparison
 
-### Web Agent
+### Web Agent (parallel track)
 
 - Real LLM client smoke-tested against a live provider (currently mock-validated)
 - Embedding-based retrieval for the RAG knowledge layer
@@ -940,9 +1034,9 @@ New users may encounter various issues when setting up or running VectorGuard. T
 
 ## Maintainer Note
 
-VectorGuard is an early open-source project focused on practical LLM and RAG security testing.
+VectorGuard is an open-source project focused on practical LLM, RAG, and AI-agent security testing.
 
-The goal is to make AI security failures easier to reproduce, document, and fix through simple YAML attack suites, target adapters, local RAG scans, clear reports, and CI-friendly workflows.
+The goal is to make AI security failures easier to reproduce, document, and fix — from simple YAML attack suites and local RAG scans to an autonomous red-team agent that captures reproducible proof, all behind clear reports and CI-friendly workflows.
 
 Feedback, test cases, detector improvements, and security review are welcome.
 
