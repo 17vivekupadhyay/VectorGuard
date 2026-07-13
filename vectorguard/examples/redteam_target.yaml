@@ -1,0 +1,18 @@
+# Target config for the autonomous red-team agent against the local mock.
+#
+# Start the mock first:
+#   python -m vectorguard.examples.redteam_mock
+#
+# Then (any value works for the key; the mock ignores it but the client sends it):
+#   VG_API_KEY=local python -m vectorguard.redteam.cli attack \
+#     --target vectorguard/examples/redteam_target.yaml --scope 127.0.0.1
+#
+# The planted system marker / secret live INSIDE the mock (server-side), exactly
+# as they would in a real app you are testing for leakage - not in this config.
+target:
+  type: openai_like
+  base_url: http://127.0.0.1:8099/v1
+  model: vg-mock
+  max_tokens: 4096
+  timeout: 30
+  api_key_env: VG_API_KEY
