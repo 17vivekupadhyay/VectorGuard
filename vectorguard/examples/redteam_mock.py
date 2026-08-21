@@ -24,7 +24,6 @@ import time
 from flask import Flask, jsonify, request
 
 from vectorguard.redteam.objectives import (
-    DEFAULT_INJECTION_CANARY,
     DEFAULT_PLANTED_SECRET,
     DEFAULT_SYSTEM_MARKER,
 )

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 CATEGORY_FINDINGS: dict[str, dict[str, str]] = {
         "rag_injection": {
         "title": "RAG prompt injection protection failed",

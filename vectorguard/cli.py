@@ -12,8 +12,9 @@ from vectorguard.reports.json_report import save_json_report
 from vectorguard.reports.markdown import save_markdown_report
 from vectorguard.reports.summary import build_summary
 from vectorguard.runner.run_suite import run_suite
-from vectorguard.targets.openai_like import OpenAILikeTarget
+from vectorguard.targets.base import BaseTarget
 from vectorguard.targets.http_target import HTTPAppTarget
+from vectorguard.targets.openai_like import OpenAILikeTarget
 
 try:
     from dotenv import load_dotenv

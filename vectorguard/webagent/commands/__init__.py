@@ -3,13 +3,13 @@
 Each command is a separate module for clarity and maintainability.
 """
 
-from .plan import cmd_plan
-from .generate import cmd_generate_tests
 from .agent import cmd_agent
-from .validate import cmd_validate
-from .scan import cmd_scan
 from .check import cmd_check
+from .generate import cmd_generate_tests
+from .plan import cmd_plan
 from .report import cmd_report
+from .scan import cmd_scan
+from .validate import cmd_validate
 
 __all__ = [
     "cmd_plan",

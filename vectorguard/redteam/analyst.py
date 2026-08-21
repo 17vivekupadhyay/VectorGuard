@@ -27,6 +27,7 @@ from .prompts import build_analyst_prompt
 
 if TYPE_CHECKING:
     from vectorguard.webagent.agent.llm_client import OpenAICompatibleClient
+
     from .objectives import CaptureResult, Objective
 
 _JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
@@ -107,7 +108,7 @@ class Assessment:
 class Analyst:
     """Reflects on each attempt and recommends the next move."""
 
-    def __init__(self, client: "OpenAICompatibleClient | None" = None) -> None:
+    def __init__(self, client: OpenAICompatibleClient | None = None) -> None:
         self._client = client
 
     @property
@@ -117,11 +118,11 @@ class Analyst:
     def reflect(
         self,
         *,
-        objective: "Objective",
+        objective: Objective,
         payload: str,
         response_text: str,
         attempted_tactics: list[str],
-        capture: "CaptureResult",
+        capture: CaptureResult,
     ) -> Assessment:
         """Return an :class:`Assessment` steering the next attempt."""
         if self._client is not None:
@@ -147,7 +148,7 @@ class Analyst:
     def _reflect_with_llm(
         self,
         *,
-        objective: "Objective",
+        objective: Objective,
         payload: str,
         response_text: str,
         attempted_tactics: list[str],
@@ -197,7 +198,7 @@ class Analyst:
         *,
         response_text: str,
         attempted_tactics: list[str],
-        capture: "CaptureResult",
+        capture: CaptureResult,
     ) -> Assessment:
         refused = looks_like_refusal(response_text)
         if capture.confidence > 0:

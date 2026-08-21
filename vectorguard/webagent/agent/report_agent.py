@@ -109,7 +109,7 @@ def generate_ai_summary(
         return client.complete(prompt)
     except LLMUnavailableError as error:
         # A configured client that fails mid-call still falls back cleanly.
-        raise AISummaryUnavailableError(str(error))
+        raise AISummaryUnavailableError(str(error)) from error
 
 
 def _findings(artifacts: dict[str, Any]) -> list[dict[str, Any]]:

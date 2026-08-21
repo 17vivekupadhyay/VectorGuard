@@ -24,6 +24,7 @@ from .seeds import seeds_for_objective
 
 if TYPE_CHECKING:
     from vectorguard.webagent.agent.llm_client import OpenAICompatibleClient
+
     from .objectives import Objective
 
 _JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
@@ -129,7 +130,7 @@ class Operator:
     def __init__(
         self,
         *,
-        client: "OpenAICompatibleClient | None" = None,
+        client: OpenAICompatibleClient | None = None,
         seeds: list[dict[str, Any]] | None = None,
         max_steps: int = 6,
     ) -> None:
@@ -144,7 +145,7 @@ class Operator:
     def propose(
         self,
         *,
-        objective: "Objective",
+        objective: Objective,
         transcript: list[dict[str, str]],
         last_response: str,
         attempted_tactics: list[str],
@@ -186,7 +187,7 @@ class Operator:
     def _propose_with_llm(
         self,
         *,
-        objective: "Objective",
+        objective: Objective,
         transcript: list[dict[str, str]],
         last_response: str,
         seeds: list[dict[str, Any]],
@@ -231,7 +232,7 @@ class Operator:
     def _propose_deterministic(
         self,
         *,
-        objective: "Objective",
+        objective: Objective,
         seeds: list[dict[str, Any]],
         step: int,
         attempted_tactics: list[str] | None = None,
@@ -264,7 +265,7 @@ class Operator:
             "source": "deterministic",
         }
 
-    def _goal_for_kind(self, objective: "Objective") -> str:
+    def _goal_for_kind(self, objective: Objective) -> str:
         """Concrete instruction text the ladder wraps, per objective kind."""
         cfg = objective.config
         if objective.kind == "system_prompt_leak":

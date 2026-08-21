@@ -1,9 +1,17 @@
 .env
 *.bak
 __pycache__/
+*.pyc
 .pytest_cache/
 .venv/
 venv/
+
+# Python packaging / build artifacts
+*.egg-info/
+build/
+dist/
+.eggs/
+.ruff_cache/
 
 vectorguard/storage/*
 !vectorguard/storage/.gitkeep

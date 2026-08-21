@@ -114,7 +114,7 @@ def plan_with_llm(
     try:
         data = json.loads(raw)
     except (TypeError, ValueError) as error:
-        raise LLMPlanValidationError(f"LLM output was not valid JSON: {error}")
+        raise LLMPlanValidationError(f"LLM output was not valid JSON: {error}") from error
 
     validated = validate_llm_plan(
         data,

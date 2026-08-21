@@ -86,7 +86,7 @@ def test_campaign_writes_reports(tmp_path):
     objectives = build_objectives(selected=["system_prompt_leak"])
     operator = Operator(client=None, seeds=[])
 
-    report = run_campaign(
+    run_campaign(
         VulnerableMockTarget(),
         objectives,
         operator,

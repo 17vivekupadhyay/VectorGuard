@@ -8,8 +8,8 @@ from __future__ import annotations
 import argparse
 
 from .shared import (
-    print_web_test_summary,
     load_web_test_or_report,
+    print_web_test_summary,
 )
 
 # Printed by commands that never send HTTP requests.

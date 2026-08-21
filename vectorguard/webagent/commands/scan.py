@@ -17,16 +17,15 @@ from ..config import build_scan_options
 from ..detectors import WebDetectorError, evaluate_detectors, validate_detector_specs
 from ..evidence import save_detector_results, save_evidence, save_raw_results
 from ..findings import build_findings_payload
-from ..models import ScanOptions
 from ..report import build_report_markdown, save_report
 from ..runner import RunnerError, run_get_test
 from ..safety import MethodSafetyError, validate_method
 from ..scope import ScopeError, validate_scope
 from .shared import (
+    load_web_test_or_report,
     maybe_write_ai_summary,
     print_scan_summary,
     print_web_test_summary,
-    load_web_test_or_report,
 )
 
 

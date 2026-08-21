@@ -19,7 +19,6 @@ from __future__ import annotations
 import argparse
 import os
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 

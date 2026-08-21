@@ -21,6 +21,7 @@ from __future__ import annotations
 from .analyst import Analyst, Assessment
 from .campaign import run_campaign
 from .episode import run_episode
+from .judge import Judge, build_judge_from_env
 from .objectives import (
     DEFAULT_INJECTION_CANARY,
     DEFAULT_PLANTED_SECRET,
@@ -31,7 +32,6 @@ from .objectives import (
     build_objectives,
 )
 from .operator import Operator
-from .judge import Judge, build_judge_from_env
 
 __all__ = [
     "run_campaign",

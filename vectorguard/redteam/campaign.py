@@ -23,6 +23,7 @@ from .episode import DEFAULT_MAX_STEPS, run_episode
 
 if TYPE_CHECKING:
     from vectorguard.targets.base import BaseTarget
+
     from .analyst import Analyst
     from .judge import Judge
     from .objectives import Objective
@@ -55,12 +56,12 @@ def _episode_to_result(episode: dict[str, Any]) -> dict[str, Any]:
 
 
 def run_campaign(
-    target: "BaseTarget",
-    objectives: list["Objective"],
-    operator: "Operator",
+    target: BaseTarget,
+    objectives: list[Objective],
+    operator: Operator,
     *,
-    judge: "Judge | None" = None,
-    analyst: "Analyst | None" = None,
+    judge: Judge | None = None,
+    analyst: Analyst | None = None,
     max_steps: int = DEFAULT_MAX_STEPS,
     out_dir: str | Path | None = None,
     metadata: dict[str, Any] | None = None,

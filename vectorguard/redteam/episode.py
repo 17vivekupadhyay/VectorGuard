@@ -28,6 +28,7 @@ from .executor import Executor
 
 if TYPE_CHECKING:
     from vectorguard.targets.base import BaseTarget
+
     from .judge import Judge
     from .objectives import Objective
     from .operator import Operator
@@ -37,13 +38,13 @@ DEFAULT_NO_PROGRESS_LIMIT = 3
 
 
 def run_episode(
-    target: "BaseTarget",
-    objective: "Objective",
-    operator: "Operator",
+    target: BaseTarget,
+    objective: Objective,
+    operator: Operator,
     *,
-    judge: "Judge | None" = None,
-    analyst: "Analyst | None" = None,
-    executor: "Executor | None" = None,
+    judge: Judge | None = None,
+    analyst: Analyst | None = None,
+    executor: Executor | None = None,
     max_steps: int = DEFAULT_MAX_STEPS,
     no_progress_limit: int = DEFAULT_NO_PROGRESS_LIMIT,
 ) -> dict[str, Any]:

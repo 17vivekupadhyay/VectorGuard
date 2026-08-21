@@ -1,6 +1,10 @@
 # VectorGuard
 
 [![VectorGuard CI](https://github.com/17vivekupadhyay/VectorGuard/actions/workflows/ci.yml/badge.svg)](https://github.com/17vivekupadhyay/VectorGuard/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Linter: ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
+[![OWASP LLM Top 10](https://img.shields.io/badge/OWASP-LLM%20Top%2010-000000.svg)](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
 
 VectorGuard is an open-source defensive security testing toolkit for LLM, RAG, and AI-agent applications, mapped to the OWASP LLM Top 10. It offers three ways to test, from a fixed regression harness to a fully autonomous attacker:
 
@@ -156,6 +160,33 @@ The main idea is simple:
 
 ---
 
+## OWASP LLM Top 10 Coverage
+
+VectorGuard maps its checks to the [OWASP Top 10 for LLM Applications (2025)](https://owasp.org/www-project-top-10-for-large-language-model-applications/).
+Coverage is deliberately honest — a check exists where marked, and gaps are
+listed as planned rather than implied.
+
+| # | Category | Status | How VectorGuard tests it |
+|---|----------|--------|--------------------------|
+| LLM01 | Prompt Injection | ✅ Covered | YAML injection suites + red-team `prompt_injection_obey` objective with an injection canary |
+| LLM02 | Sensitive Information Disclosure | ✅ Covered | Forbidden-secret detectors + red-team `credential_exfil` (planted secret, DLP/entropy scan) |
+| LLM03 | Supply Chain | ⬜ Planned | Out of scope for black-box runtime testing |
+| LLM04 | Data & Model Poisoning | 🟡 Partial | Local RAG scan loads poisoned documents and tests whether the model obeys injected retrieved content |
+| LLM05 | Improper Output Handling | ⬜ Planned | — |
+| LLM06 | Excessive Agency | ⬜ Planned | — |
+| LLM07 | System Prompt Leakage | ✅ Covered | System-prompt-leak detectors + red-team `system_prompt_leak` objective with a planted marker |
+| LLM08 | Vector & Embedding Weaknesses | 🟡 Partial | Retrieval-poisoning signals via local RAG scan mode |
+| LLM09 | Misinformation | ⬜ Planned | — |
+| LLM10 | Unbounded Consumption | ✅ Covered | `max_output_chars` detector + red-team `unbounded_consumption` objective with a measured token/latency budget oracle |
+
+**Legend:** ✅ implemented check &nbsp;·&nbsp; 🟡 partial / indirect &nbsp;·&nbsp; ⬜ planned
+
+> Passing a check is a signal for review, not proof of security. Absence of a
+> check does not mean the risk is absent — only that VectorGuard does not yet
+> test for it.
+
+---
+
 ## Current Features
 
 - **Autonomous LLM red-team agent**:
@@ -255,11 +286,35 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-### 3. Install dependencies
+### 3. Install VectorGuard
+
+Install the package (this also registers the `vectorguard*` console commands):
+
+```bash
+pip install -e .
+```
+
+For development (adds `pytest` and `ruff`):
+
+```bash
+pip install -e ".[dev]"
+```
+
+Or, for a dependencies-only setup without installing the package:
 
 ```bash
 pip install -r requirements.txt
 ```
+
+Once installed, the CLIs are available as console commands (equivalent to the
+`python -m ...` forms used throughout this README):
+
+| Command | Equivalent module | Purpose |
+|---------|-------------------|---------|
+| `vectorguard` | `python -m vectorguard.cli` | YAML LLM/RAG attack suites |
+| `vectorguard-redteam` | `python -m vectorguard.redteam.cli` | Autonomous red-team agent |
+| `vectorguard-web` | `python -m vectorguard.webagent.cli` | Web Agent (OWASP web testing) |
+| `vectorguard-rag` | `python -m vectorguard.rag_scan` | Local RAG scan mode |
 
 ---
 
@@ -884,21 +939,33 @@ Reports include:
 
 ## Continuous Integration
 
-VectorGuard includes a GitHub Actions CI workflow.
+VectorGuard's GitHub Actions workflow runs two jobs on every push and pull request.
 
-The CI smoke test:
+**Job 1 — Lint & unit tests:**
 
-1. Installs dependencies
-2. Compiles Python files
-3. Starts the safe mock chatbot
-4. Runs VectorGuard and expects no findings
-5. Runs expected-answer validation
-6. Runs a safe local RAG scan
-7. Starts the vulnerable mock chatbot
-8. Runs VectorGuard and expects findings
-9. Runs a vulnerable local RAG scan and expects poisoned-context detection
+1. Installs the package with dev extras (`pip install -e ".[dev]"`)
+2. Lints with `ruff` (pyflakes, import order, pyupgrade, bugbear)
+3. Runs the full `pytest` unit suite
 
-This confirms that the generic HTTP target adapter, expected-answer detector, and local RAG scan mode work end-to-end.
+**Job 2 — Integration smoke tests:**
+
+1. Installs dependencies and compiles the package
+2. Starts the safe mock chatbot, runs VectorGuard, and expects no findings
+3. Runs expected-answer validation and a safe local RAG scan
+4. Starts the vulnerable mock chatbot, runs VectorGuard, and expects findings
+5. Runs a vulnerable local RAG scan and expects poisoned-context detection
+
+Job 1 catches regressions and dead/undefined code fast; Job 2 confirms the
+generic HTTP target adapter, expected-answer detector, and local RAG scan mode
+work end-to-end.
+
+You can reproduce both locally:
+
+```bash
+pip install -e ".[dev]"
+ruff check vectorguard tests
+pytest -q
+```
 
 ---
 

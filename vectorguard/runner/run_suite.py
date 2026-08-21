@@ -3,13 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from vectorguard.config.loader import load_yaml_file, resolve_string
 from vectorguard.core.findings import build_finding
 from vectorguard.core.scoring import calculate_risk_score
 from vectorguard.evaluators.detectors import evaluate_response
-
 
 REQUIRED_TEST_FIELDS = {"name", "category"}
 

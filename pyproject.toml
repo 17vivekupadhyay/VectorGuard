@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vectorguard"
+version = "2.0.0"
+description = "Defensive security testing toolkit for LLM, RAG, and AI-agent applications, mapped to the OWASP LLM Top 10."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Vivek Upadhyay" }]
+keywords = [
+    "security",
+    "llm",
+    "rag",
+    "owasp",
+    "prompt-injection",
+    "red-team",
+    "ai-security",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+dependencies = [
+    "httpx",
+    "pyyaml",
+    "python-dotenv",
+    "flask",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "ruff>=0.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/17vivekupadhyay/VectorGuard"
+Repository = "https://github.com/17vivekupadhyay/VectorGuard"
+
+# Console commands installed on `pip install .`
+[project.scripts]
+vectorguard = "vectorguard.cli:main"
+vectorguard-web = "vectorguard.webagent.cli:main"
+vectorguard-redteam = "vectorguard.redteam.cli:main"
+vectorguard-rag = "vectorguard.rag_scan:main"
+
+[tool.setuptools.packages.find]
+include = ["vectorguard*"]
+
+[tool.setuptools.package-data]
+# Ship the bundled web-test templates with the wheel.
+vectorguard = ["web_tests/**/*.yaml"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+# F  = pyflakes (unused imports, undefined names)
+# E  = pycodestyle errors
+# I  = import sorting
+# UP = pyupgrade (modern syntax)
+# B  = bugbear (likely bugs, e.g. raise-without-from)
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]  # long lines are allowed
