@@ -80,7 +80,7 @@ class OpenAICompatibleClient:
         except (httpx.HTTPError, ValueError) as error:
             raise LLMUnavailableError(
                 f"LLM request failed ({error}); falling back to deterministic."
-            )
+            ) from error
         return response.text
 
 

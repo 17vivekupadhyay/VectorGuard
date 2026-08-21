@@ -10,7 +10,6 @@ import httpx
 
 from .base import BaseTarget, TargetResponse
 
-
 PLACEHOLDER_RE = re.compile(r"\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}")
 
 

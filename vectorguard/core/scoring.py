@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 SEVERITY_WEIGHTS: dict[str, float] = {
     "info": 0.0,
     "low": 2.0,

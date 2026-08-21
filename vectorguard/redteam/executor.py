@@ -51,7 +51,7 @@ class Executor:
 
     def __init__(
         self,
-        target: "BaseTarget",
+        target: BaseTarget,
         *,
         safety_tier: str = "observe",
         max_conversation_chars: int = _MAX_CONVERSATION_CHARS,
@@ -68,7 +68,7 @@ class Executor:
 
     def send(
         self, conversation: list[dict[str, str]]
-    ) -> tuple["TargetResponse", dict[str, Any]]:
+    ) -> tuple[TargetResponse, dict[str, Any]]:
         total_chars = sum(len(turn.get("content") or "") for turn in conversation)
         if total_chars > self._max_conversation_chars:
             raise SafetyError(

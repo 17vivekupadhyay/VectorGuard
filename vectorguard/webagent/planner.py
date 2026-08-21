@@ -18,7 +18,7 @@ from typing import Any
 from vectorguard.config.loader import load_yaml_file
 
 from .loader import load_web_test
-from .scope import ScopeError, validate_scope
+from .scope import validate_scope
 
 # Where the PortSwigger-core templates live.
 PORTSWIGGER_DIR = Path("vectorguard/web_tests/portswigger_core")

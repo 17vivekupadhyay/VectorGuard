@@ -21,6 +21,7 @@ from .prompts import build_judge_prompt
 
 if TYPE_CHECKING:  # avoid importing the client at module load / on the no-key path
     from vectorguard.webagent.agent.llm_client import OpenAICompatibleClient
+
     from .objectives import Objective
 
 
@@ -48,13 +49,13 @@ def _extract_json(raw: str) -> dict[str, Any] | None:
 class Judge:
     """Wraps an LLM client to grade whether a response satisfies an objective."""
 
-    def __init__(self, client: "OpenAICompatibleClient") -> None:
+    def __init__(self, client: OpenAICompatibleClient) -> None:
         self._client = client
 
     def assess(
         self,
         *,
-        objective: "Objective",
+        objective: Objective,
         payload: str,
         response_text: str,
     ) -> dict[str, Any] | None:
@@ -92,7 +93,7 @@ class Judge:
     def bind(self, payload: str):
         """Return a ``JudgeFn`` (objective, response_text) -> verdict for a step."""
 
-        def _fn(objective: "Objective", response_text: str) -> dict[str, Any] | None:
+        def _fn(objective: Objective, response_text: str) -> dict[str, Any] | None:
             return self.assess(
                 objective=objective,
                 payload=payload,
@@ -102,7 +103,7 @@ class Judge:
         return _fn
 
 
-def build_judge_from_env() -> "Judge | None":
+def build_judge_from_env() -> Judge | None:
     """Build a judge from env (shared LLM config), or ``None`` if unconfigured."""
     from vectorguard.webagent.agent.llm_client import build_llm_client_from_env
 

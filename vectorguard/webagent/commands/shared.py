@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ..agent import get_llm_client
 from ..agent.report_agent import (
-    AISummaryUnavailableError,
     FALLBACK_SUMMARY_MESSAGE,
+    AISummaryUnavailableError,
     generate_ai_summary,
     load_scan_artifacts,
     placeholder_summary_markdown,
     save_agent_summary,
 )
-from ..agent import get_llm_client
 from ..loader import WebTestValidationError, load_web_test
 from ..models import WebTest
 
@@ -75,9 +75,9 @@ def print_scan_summary(options, out_path: Path, host: str) -> None:
     print(f"  Target:        {options.target}")
     print(f"  Target host:   {host or '(could not parse)'}")
     print(f"  Scope:         {', '.join(options.scope)}")
-    print(f"  In scope:      True (enforced)")
+    print("  In scope:      True (enforced)")
     print(f"  Tests:         {options.tests or '(none provided)'}")
     print(f"  Output dir:    {out_path}")
     print(f"  Safety mode:   {safety_mode}")
     print(f"  State-changing allowed: {options.allow_state_changing}")
-    print(f"  Blocked methods (default): DELETE, PUT, PATCH")
+    print("  Blocked methods (default): DELETE, PUT, PATCH")
