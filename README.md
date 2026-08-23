@@ -6,15 +6,16 @@
 [![Linter: ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![OWASP LLM Top 10](https://img.shields.io/badge/OWASP-LLM%20Top%2010-000000.svg)](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
 
-VectorGuard is an open-source defensive security testing toolkit for LLM, RAG, and AI-agent applications, mapped to the OWASP LLM Top 10. It offers three ways to test, from a fixed regression harness to a fully autonomous attacker:
+VectorGuard is an open-source defensive security testing toolkit for LLM, RAG, and AI-agent applications, mapped to the OWASP LLM Top 10. It offers several ways to test, from a fixed regression harness to a fully autonomous attacker:
 
 1. **YAML attack suites** — repeatable, scripted black-box tests run against OpenAI-compatible chat endpoints or generic HTTP chatbot APIs, evaluated with configurable detectors and turned into JSON/Markdown reports (pass/fail, risk scores, detector evidence, model responses, latency, transcripts).
 2. **Autonomous red-team agent** — an attacker that pursues OWASP objectives on its own, adapts its tactics based on how the target responds, and escalates until it captures real proof of a vulnerability. It is *adaptive, not a script replayer*, and *proof-based, not a heuristic alerter*.
 3. **Web Agent** — a bounded, GET-only agent for authorized OWASP-style web application testing.
+4. **Black-box agent** — point-and-shoot testing of a chatbot given *just a URL*: it auto-detects the API shape and runs the autonomous LLM-security battery (prompt injection, unbounded consumption, sensitive disclosure, system-prompt leakage) with an optional LLM-driven attacker and single- or multi-turn modes, reporting findings with honest confidence bands.
 
 VectorGuard also includes a local RAG scan mode that loads documents from disk, chunks them, retrieves relevant context, builds a RAG-style prompt, and tests whether the target follows malicious retrieved content.
 
-> **Status:** v2.0 — adds the Autonomous LLM Red-Team Agent  
+> **Status:** adds a point-and-shoot **Black-Box Agent** (LLM-driven, single- and multi-turn) and a sandbox excessive-agency lab, alongside the Autonomous LLM Red-Team Agent  
 > VectorGuard is a defensive testing aid for systems you own or are explicitly authorized to test. Passing VectorGuard tests does not prove that an AI system is secure, and failing tests should be treated as signals for further review.
 
 ---
@@ -137,6 +138,45 @@ deterministic when no key is set), and `agent` accepts `--discover` and
 See **[docs/webagent.md](docs/webagent.md)** for the full guide: safety model,
 architecture, supported checks, output format, how to add templates, limitations,
 and roadmap.
+
+---
+
+## Black-Box Agent (point-and-shoot)
+
+`vectorguard-blackbox` is an authorized **black-box** tester for chatbot
+endpoints. Give it a URL and a required `--scope`; it auto-detects the chat API
+shape and runs the autonomous LLM-security battery — no config, no planted flags.
+
+```bash
+vectorguard-blackbox pentest --url http://localhost:8000/chat --scope localhost --out reports/bb
+
+# LLM-driven, multi-turn attacker (point it at OpenAI or a free local model):
+export LLM_BASE_URL=http://localhost:11434/v1 LLM_MODEL=llama3.1
+vectorguard-blackbox pentest --url http://localhost:8000/chat --scope localhost \
+  --operator llm --max-turns 4
+```
+
+How it proves findings without instrumenting the target — each with an honest
+confidence band:
+
+| Objective | Detection | Confidence |
+|-----------|-----------|------------|
+| Prompt injection (LLM01) | an injected **canary** the agent controls, echoed back | deterministic |
+| Unbounded consumption (LLM10) | measured response size / latency | high |
+| Sensitive disclosure (LLM02) | DLP / entropy vs a clean baseline | medium |
+| System-prompt leakage (LLM07) | heuristic phrasing | low ("needs review") |
+
+- **Auto-adapter** detects common request shapes (`POST {message}`/`{prompt}`/…, or `GET`).
+- **Two operators**: a deterministic payload battery (key-free) or an optional LLM
+  operator that generates and adapts payloads.
+- **Single-shot or multi-turn** (`--max-turns > 1`): one evolving conversation that
+  primes a premise, then strikes.
+- **Safe by design**: `--scope` is mandatory (target host must match), it is
+  talk-only, and secrets are redacted in reports.
+
+Works for standard JSON chat APIs; authenticated, websocket/session-based, or
+web-widget-only bots need an explicit `--target` config (there is no browser
+automation). Black-box findings are signals to triage, not verified verdicts.
 
 ---
 
@@ -315,6 +355,7 @@ Once installed, the CLIs are available as console commands (equivalent to the
 | `vectorguard-redteam` | `python -m vectorguard.redteam.cli` | Autonomous red-team agent |
 | `vectorguard-web` | `python -m vectorguard.webagent.cli` | Web Agent (OWASP web testing) |
 | `vectorguard-rag` | `python -m vectorguard.rag_scan` | Local RAG scan mode |
+| `vectorguard-blackbox` | `python -m vectorguard.blackbox.cli` | Point-and-shoot black-box chatbot testing |
 
 ---
 
