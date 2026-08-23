@@ -20,18 +20,19 @@ branch.
 7. [Local RAG scan mode](#7-local-rag-scan-mode)
 8. [Tier 2 — Autonomous red-team agent](#8-tier-2--autonomous-red-team-agent)
 9. [Tier 3 — Web Agent](#9-tier-3--web-agent)
-10. [The agentic red-team framework (excessive-agency lab)](#10-the-agentic-red-team-framework-excessive-agency-lab)
-11. [Detectors reference](#11-detectors-reference)
-12. [Scoring & findings](#12-scoring--findings)
-13. [Reports & evidence](#13-reports--evidence)
-14. [OWASP LLM Top 10 coverage](#14-owasp-llm-top-10-coverage)
-15. [Safety model & responsible use](#15-safety-model--responsible-use)
-16. [Trade-offs & limitations](#16-trade-offs--limitations)
-17. [How it's engineered](#17-how-its-engineered)
-18. [Extending VectorGuard](#18-extending-vectorguard)
-19. [Where it sits among other tools](#19-where-it-sits-among-other-tools)
-20. [Command cheat sheet](#20-command-cheat-sheet)
-21. [Glossary](#21-glossary)
+10. [The black-box agent (point-and-shoot)](#10-the-black-box-agent-point-and-shoot)
+11. [The agentic red-team framework (excessive-agency lab)](#11-the-agentic-red-team-framework-excessive-agency-lab)
+12. [Detectors reference](#12-detectors-reference)
+13. [Scoring & findings](#13-scoring--findings)
+14. [Reports & evidence](#14-reports--evidence)
+15. [OWASP LLM Top 10 coverage](#15-owasp-llm-top-10-coverage)
+16. [Safety model & responsible use](#16-safety-model--responsible-use)
+17. [Trade-offs & limitations](#17-trade-offs--limitations)
+18. [How it's engineered](#18-how-its-engineered)
+19. [Extending VectorGuard](#19-extending-vectorguard)
+20. [Where it sits among other tools](#20-where-it-sits-among-other-tools)
+21. [Command cheat sheet](#21-command-cheat-sheet)
+22. [Glossary](#22-glossary)
 
 ---
 
@@ -55,8 +56,9 @@ It exposes **three modes of testing** over **one shared engine**:
 | 2 | `vectorguard-redteam` | An autonomous LLM attacker that adapts and escalates |
 | 3 | `vectorguard-web` | A bounded, safe-by-default OWASP web-app scanner |
 
-Plus `vectorguard-rag` (local RAG-poisoning scan) and a clearly-fenced
-excessive-agency **lab PoC**.
+Plus `vectorguard-blackbox` (point-and-shoot black-box testing of any chatbot
+URL), `vectorguard-rag` (local RAG-poisoning scan), and a clearly-fenced
+excessive-agency **lab**.
 
 **The one principle that unifies everything:** the LLM *plans and generates*
 attacks; deterministic Python *executes* them and *judges* the results — so the
@@ -111,7 +113,7 @@ pip install -e .
 pip install -e ".[dev]"
 ```
 
-This registers four console commands:
+This registers five console commands:
 
 | Command | Module equivalent |
 |---------|-------------------|
@@ -119,6 +121,7 @@ This registers four console commands:
 | `vectorguard-redteam` | `python -m vectorguard.redteam.cli` |
 | `vectorguard-web` | `python -m vectorguard.webagent.cli` |
 | `vectorguard-rag` | `python -m vectorguard.rag_scan` |
+| `vectorguard-blackbox` | `python -m vectorguard.blackbox.cli` |
 
 > Everywhere below, `vectorguard …` and `python -m vectorguard.cli …` are
 > interchangeable. The module form always works even without installing.
@@ -141,7 +144,7 @@ fallback**, or the **excessive-agency lab** needs a key.
 
 ```bash
 python -m compileall vectorguard      # compiles clean
-pytest -q                             # 107 unit tests pass
+pytest -q                             # unit suite passes
 vectorguard --help
 ```
 
@@ -213,6 +216,7 @@ Every tier reuses this spine. The reusable core lives in:
 Tier 1  vectorguard.cli            scripted YAML suites      (deterministic replay)
 Tier 2  vectorguard.redteam.cli    autonomous attacker       (adaptive, proof-based)
 Tier 3  vectorguard.webagent.cli   bounded OWASP web scanner  (safe-by-default)
+        vectorguard.blackbox.cli   point-and-shoot black-box chatbot testing
         vectorguard.rag_scan       local RAG-poisoning scan
 ```
 
@@ -242,7 +246,12 @@ vectorguard/
   webagent/              Tier 3: cli + commands/, config, scope, safety,
                          models, loader, detectors, findings, evidence,
                          runner, planner, generator, report, agent/
+  blackbox/              point-and-shoot: adapter, oracle, probes, operator,
+                         campaign, llm, report, cli
 ```
+
+(The excessive-agency lab lives outside the package, under
+`examples/excessive_agency_lab/`, so it can't affect the shipping tools.)
 
 ---
 
@@ -570,7 +579,71 @@ There's a local intentionally-vulnerable demo app at
 
 ---
 
-## 10. The agentic red-team framework (excessive-agency lab)
+## 10. The black-box agent (point-and-shoot)
+
+**Command:** `vectorguard-blackbox`. **Purpose:** authorized *black-box* testing
+of a chatbot given just a URL — no config, no planted flags.
+
+Give it a URL and a required `--scope`; it auto-detects the chat API shape and
+runs the autonomous LLM-security battery, writing a triage-ready report.
+
+### How it works
+
+- **Auto-adapter** (`blackbox/adapter.py`) probes common request shapes
+  (`POST {message}`/`{prompt}`/…, or `GET`) and reuses `HTTPAppTarget`'s response
+  detection — standard JSON chat APIs need no config.
+- **Black-box oracle** (`blackbox/oracle.py`) proves findings without
+  instrumenting the target, each with an honest confidence band:
+
+| Objective | Detection | Confidence |
+|-----------|-----------|------------|
+| Prompt injection (LLM01) | an injected **canary** the agent controls, echoed back | deterministic |
+| Unbounded consumption (LLM10) | measured response size / latency | high |
+| Sensitive disclosure (LLM02) | DLP / entropy vs a clean baseline | medium |
+| System-prompt leakage (LLM07) | heuristic phrasing | low ("needs review") |
+
+- **Two operators**: a deterministic payload **battery** (key-free) or an optional
+  **LLM operator** that generates and adapts payloads.
+- **Single-shot or multi-turn**: `--max-turns > 1` runs one evolving conversation
+  (prime a premise, then strike — a "crescendo").
+
+### CLI: `vectorguard-blackbox pentest`
+
+| Flag | Meaning |
+|------|---------|
+| `--url` | Chatbot endpoint URL |
+| `--scope` | Allowed host (repeatable, **required**); target host must match |
+| `--objectives` | `injection,consumption,disclosure,system_prompt` or `all` |
+| `--operator` | `battery` (default) or `llm` (set `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY`) |
+| `--max-turns` | >1 enables multi-turn conversation mode |
+| `--max-steps` | probes per objective (single-shot) |
+| `--canary` | injection canary token (default: random) |
+| `--out` | write JSON + Markdown reports |
+| `--fail-on-capture` | exit 1 if any finding fires |
+
+### Worked example
+
+```bash
+# free local model via Ollama (or point at OpenAI)
+export LLM_BASE_URL=http://localhost:11434/v1 LLM_MODEL=llama3.1
+vectorguard-blackbox pentest \
+  --url http://localhost:8000/chat --scope localhost \
+  --operator llm --max-turns 4 --out reports/bb
+```
+
+### Honest limits
+
+Works for **standard JSON chat APIs**. It cannot handle authenticated APIs
+without credentials, websocket/streaming or session-based bots (pass an explicit
+`--target` config), or web-widget-only chatbots (no browser automation).
+Black-box findings are **signals to triage**, not verified verdicts — the
+confidence bands and the report disclaimer say so. Scope is mandatory; it is
+talk-only and redacts secrets; LLM-operator strength scales with the model.
+
+---
+
+
+## 11. The agentic red-team framework (excessive-agency lab)
 
 **Location:** `examples/excessive_agency_lab/`. **Status:** a full lab framework —
 the one place VectorGuard crosses from *talk-only* to *taking an action*,
@@ -671,7 +744,7 @@ tool keeps its talk-only guarantee.
 
 ---
 
-## 11. Detectors reference
+## 12. Detectors reference
 
 Detectors turn a response into a deterministic signal. Two families:
 
@@ -708,7 +781,7 @@ suspicious.
 
 ---
 
-## 12. Scoring & findings
+## 13. Scoring & findings
 
 `vectorguard/core/scoring.py`:
 
@@ -735,7 +808,7 @@ detector confidence (`low/medium/high` → factor).
 
 ---
 
-## 13. Reports & evidence
+## 14. Reports & evidence
 
 Every run writes a structured output directory:
 
@@ -757,7 +830,7 @@ tagged in config are masked. Never commit real keys/cookies/tokens.
 
 ---
 
-## 14. OWASP LLM Top 10 coverage
+## 15. OWASP LLM Top 10 coverage
 
 Honest posture (2025 taxonomy):
 
@@ -779,7 +852,7 @@ check means VectorGuard does not yet test it — not that the risk is absent.
 
 ---
 
-## 15. Safety model & responsible use
+## 16. Safety model & responsible use
 
 VectorGuard is for defensive testing of systems you own or are explicitly
 authorized to test (local labs, owned apps, PortSwigger-style practice targets).
@@ -807,7 +880,7 @@ it's **dual-use** — bounded to *reduce* misuse, not marketed as misuse-proof.
 
 ---
 
-## 16. Trade-offs & limitations
+## 17. Trade-offs & limitations
 
 The honest edges — know these cold:
 
@@ -835,7 +908,7 @@ The honest edges — know these cold:
 
 ---
 
-## 17. How it's engineered
+## 18. How it's engineered
 
 - **Dependency-light, pure Python.** Four deps; no ORM, no heavy framework. For a
   security tool, "easy to read and audit" is a feature.
@@ -861,7 +934,7 @@ pytest -q
 
 ---
 
-## 18. Extending VectorGuard
+## 19. Extending VectorGuard
 
 **Add an LLM detector:** implement it in `vectorguard/evaluators/detectors.py`,
 register it in the detector registry, add a unit test under `tests/`.
@@ -889,7 +962,7 @@ in `webagent/cli.py`.
 
 ---
 
-## 19. Where it sits among other tools
+## 20. Where it sits among other tools
 
 - **NVIDIA garak** — LLM vulnerability *probe* scanner (≈ Tier 1).
 - **Microsoft PyRIT** — GenAI red-teaming framework (≈ Tier 2).
@@ -903,7 +976,7 @@ oracle and the safety model, not breadth.
 
 ---
 
-## 20. Command cheat sheet
+## 21. Command cheat sheet
 
 ```bash
 # ---- install ----
@@ -926,6 +999,10 @@ vectorguard-web plan    --config <cfg> --out reports/web_plan
 vectorguard-web agent   --config <cfg> --max-steps 10 [--discover] --out reports/web_agent_run
 vectorguard-web report  --out reports/web_scan [--ai-summary]
 
+# ---- black-box agent (point-and-shoot, just a URL) ----
+vectorguard-blackbox pentest --url <chatbot-url> --scope <host> --out reports/bb
+vectorguard-blackbox pentest --url <chatbot-url> --scope <host> --operator llm --max-turns 4
+
 # ---- agentic red-team lab (sandbox, LLM06) ----
 cd examples/excessive_agency_lab
 python3 autonomous_exploiter.py                                   # quick single-target demo
@@ -940,7 +1017,7 @@ python -m compileall vectorguard
 
 ---
 
-## 21. Glossary
+## 22. Glossary
 
 - **Detector** — a deterministic check that turns a response into a signal
   (contains, regex, refusal, status_code, error_keywords…).
