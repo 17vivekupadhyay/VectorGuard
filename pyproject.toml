@@ -50,6 +50,7 @@ vectorguard = "vectorguard.cli:main"
 vectorguard-web = "vectorguard.webagent.cli:main"
 vectorguard-redteam = "vectorguard.redteam.cli:main"
 vectorguard-rag = "vectorguard.rag_scan:main"
+vectorguard-blackbox = "vectorguard.blackbox.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["vectorguard*"]
