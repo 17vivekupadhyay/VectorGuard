@@ -17,6 +17,7 @@ from .adapter import AdapterError
 from .campaign import ScopeError, run_blackbox
 from .llm import LLMClient
 from .operator import build_operator
+from .orchestrator import build_orchestrator
 from .report import save_report
 
 GREEN, RED, YELLOW, DIM, BOLD, RESET = (
@@ -39,9 +40,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--objectives", default="all",
                    help="Comma-separated: injection,consumption,disclosure,system_prompt (or all).")
     p.add_argument("--canary", default=None, help="Injection canary token (default: random).")
-    p.add_argument("--operator", choices=["battery", "llm"], default="battery",
-                   help="Attacker brain. 'llm' generates & adapts payloads (set LLM_BASE_URL / "
-                        "LLM_MODEL / LLM_API_KEY); falls back to battery if unavailable.")
+    p.add_argument("--operator", choices=["battery", "llm", "orchestrated"], default="battery",
+                   help="Attacker brain. 'llm' = one adaptive LLM operator; 'orchestrated' = a "
+                        "team of per-objective specialist LLM agents; both need LLM_BASE_URL / "
+                        "LLM_MODEL / LLM_API_KEY and fall back to the deterministic battery.")
     p.add_argument("--max-steps", type=int, default=5,
                    help="Max independent probes per objective (single-shot mode).")
     p.add_argument("--max-turns", type=int, default=1,
@@ -69,11 +71,18 @@ def cmd_pentest(args: argparse.Namespace) -> int:
     print(f"{DIM}point-and-shoot · talk-only · scope={args.scope}{RESET}")
 
     operator = None
-    if args.operator == "llm":
+    if args.operator in ("llm", "orchestrated"):
         client = LLMClient.from_env()
         if client is None:
             print(f"{YELLOW}[operator] LLM not configured (set LLM_BASE_URL + LLM_MODEL); "
                   f"using deterministic battery.{RESET}")
+            if args.operator == "orchestrated":
+                operator = build_orchestrator(None)  # battery specialists (== battery)
+        elif args.operator == "orchestrated":
+            print(f"{DIM}[operator] orchestrated: specialist LLM agents per objective "
+                  f"(injection, consumption, disclosure, system_prompt) @ "
+                  f"{client.describe()}{RESET}")
+            operator = build_orchestrator(client)
         else:
             print(f"{DIM}[operator] LLM: {client.describe()} (battery fallback armed){RESET}")
             operator = build_operator("llm", client)

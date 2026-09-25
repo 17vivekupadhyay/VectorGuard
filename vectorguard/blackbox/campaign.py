@@ -48,6 +48,7 @@ class BlackBoxResult:
     url: str
     adapter: str
     objectives: list[str]
+    operator: str = "battery"
     findings: list[Finding] = field(default_factory=list)
     baseline_excerpt: str = ""
 
@@ -59,11 +60,20 @@ class BlackBoxResult:
         return {
             "url": self.url,
             "adapter": self.adapter,
+            "operator": self.operator,
             "objectives": self.objectives,
             "captured_count": len(self.captured),
             "findings": [f.to_dict() for f in self.findings],
             "baseline_excerpt": self.baseline_excerpt,
         }
+
+
+def _agent_label(operator: Any, objective: str) -> str:
+    """The sub-agent responsible for an objective (specialist name for orchestrators)."""
+    fn = getattr(operator, "agent_for", None)
+    if callable(fn):
+        return fn(objective)
+    return getattr(operator, "name", "battery")
 
 
 def run_blackbox(
@@ -108,10 +118,11 @@ def run_blackbox(
     baseline: Baseline = make_baseline(probe_resp.text, probe_resp.latency_ms)
 
     run = BlackBoxResult(url=url, adapter=adapter_note, objectives=objectives,
+                         operator=getattr(operator, "name", "battery"),
                          baseline_excerpt=probe_resp.text[:160])
 
     mode = "multi-turn" if max_turns > 1 else "single-shot"
-    say(f"[mode    ] {mode} · operator={getattr(operator, 'name', 'battery')}")
+    say(f"[mode    ] {mode} · operator={run.operator}")
 
     for objective in objectives:
         say(f"\n=== objective: {objective} ===")
@@ -127,6 +138,7 @@ def run_blackbox(
                 max_steps=max_steps, max_chars=max_chars, max_latency_ms=max_latency_ms,
                 say=say,
             )
+        finding.agent = _agent_label(operator, objective)
         run.findings.append(finding)
 
     return run

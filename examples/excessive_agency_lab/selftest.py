@@ -8,6 +8,7 @@ gates block, and every capture is inert.
 
 from __future__ import annotations
 
+from agents import OrchestratorOperator
 from engine import run_campaign
 from llm_client import LLMUnavailable
 from objectives import build_objectives
@@ -115,6 +116,43 @@ def main() -> int:
     r = run_campaign(build_target("naive-auth"), build_objectives(["delete_account"], "bob"),
                      fb, authorized_lab=True, max_steps=8, verbose=False)
     check("llm outage falls back and still exploits", r.results[0].captured)
+
+    # --- multi-agent orchestrator: routes to the specialist that owns the flaw ---
+    def orch(profile: str):
+        return run_campaign(build_target(profile), build_objectives(["delete_account"], "bob"),
+                            OrchestratorOperator(), authorized_lab=True, max_steps=8,
+                            verbose=False)
+
+    def specialists_in(res) -> list[str]:
+        out: list[str] = []
+        for st in res.trace:
+            spec = st.tactic.split(":")[0]
+            if spec not in out:
+                out.append(spec)
+        return out
+
+    r = orch("naive-auth")
+    res = r.results[0]
+    check("orchestrator label recorded", r.operator == "orchestrator")
+    check("orchestrator exploits naive-auth via social-engineer",
+          res.captured and res.winning_tactic.startswith("social-engineer:"))
+
+    r = orch("indirect-injection")
+    res = r.results[0]
+    check("orchestrator exploits indirect-injection via injector",
+          res.captured and res.winning_tactic.startswith("injector:"))
+    check("orchestrator re-routed social-engineer -> injector",
+          specialists_in(res)[:2] == ["social-engineer", "injector"])
+
+    r = orch("schema-confusion")
+    res = r.results[0]
+    check("orchestrator exploits schema-confusion via protocol",
+          res.captured and res.winning_tactic.startswith("protocol:"))
+    check("orchestrator routed through all three specialists",
+          specialists_in(res) == ["social-engineer", "injector", "protocol"])
+
+    r = orch("hardened")
+    check("orchestrator resists hardened", not r.results[0].captured)
 
     print()
     if FAILS:

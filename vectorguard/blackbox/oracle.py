@@ -39,6 +39,7 @@ class Finding:
     proof: str = ""
     response_excerpt: str = ""
     turns: int = 1
+    agent: str = ""  # the sub-agent that worked this objective
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -48,6 +49,7 @@ class Finding:
             "method": self.method,
             "confidence": self.confidence,
             "confidence_weight": CONFIDENCE_WEIGHT.get(self.confidence, 0.0),
+            "agent": self.agent,
             "turns": self.turns,
             "payload": self.payload,
             "evidence": self.evidence,

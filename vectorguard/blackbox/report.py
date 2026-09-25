@@ -17,6 +17,7 @@ def render_markdown(run: BlackBoxResult) -> str:
         "",
         f"- Generated: {datetime.now(UTC).isoformat()}",
         f"- Adapter: {run.adapter}",
+        f"- Operator: {run.operator}",
         f"- Objectives: {', '.join(run.objectives)}",
         f"- Findings captured: **{len(run.captured)}/{len(run.findings)}**",
         "",
@@ -25,12 +26,13 @@ def render_markdown(run: BlackBoxResult) -> str:
         "",
         "## Summary",
         "",
-        "| Objective | OWASP | Result | Confidence | Method |",
-        "|-----------|-------|--------|------------|--------|",
+        "| Objective | OWASP | Result | Confidence | Method | Agent |",
+        "|-----------|-------|--------|------------|--------|-------|",
     ]
     for f in sorted(run.findings, key=lambda x: _CONF_ORDER.get(x.confidence, 9)):
         status = "🔴 signal" if f.captured else "🟢 none"
-        lines.append(f"| {f.objective} | {f.owasp} | {status} | {f.confidence} | {f.method} |")
+        lines.append(f"| {f.objective} | {f.owasp} | {status} | {f.confidence} | "
+                     f"{f.method} | {f.agent or '—'} |")
     lines.append("")
 
     for f in run.findings:
@@ -39,6 +41,7 @@ def render_markdown(run: BlackBoxResult) -> str:
         lines += [
             f"## {f.objective} ({f.owasp}) — {f.confidence} confidence",
             "",
+            f"- **Agent:** {f.agent or '—'}",
             f"- **Evidence:** {f.evidence}",
             f"- **Probe:** `{f.payload[:200]}`",
         ]

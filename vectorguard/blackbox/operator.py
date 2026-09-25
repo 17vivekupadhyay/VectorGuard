@@ -73,6 +73,9 @@ class BatteryOperator:
         idx = _user_turns(conversation)
         return script[idx] if idx < len(script) else None
 
+    def agent_for(self, objective: str) -> str:
+        return self.name
+
 
 def _clean(text: str) -> str:
     t = (text or "").strip()
@@ -93,8 +96,10 @@ def _clean(text: str) -> str:
 class LLMPayloadOperator:
     name = "llm"
 
-    def __init__(self, client: Any, *, context_turns: int = 8) -> None:
+    def __init__(self, client: Any, *, system_prompt: str | None = None,
+                 context_turns: int = 8) -> None:
         self._client = client
+        self._system = system_prompt or _SYSTEM
         self._battery = BatteryOperator()
         self._context_turns = context_turns
 
@@ -120,7 +125,7 @@ class LLMPayloadOperator:
 
     def propose(self, objective: str, canary: str, history: History) -> str | None:
         try:
-            raw = self._client.chat(_SYSTEM, self._user_prompt(objective, canary, history))
+            raw = self._client.chat(self._system, self._user_prompt(objective, canary, history))
             payload = _clean(raw)
             if not payload:
                 raise LLMUnavailable("empty completion")
@@ -153,7 +158,7 @@ class LLMPayloadOperator:
     def propose_turn(self, objective: str, canary: str,
                      conversation: list[dict[str, str]]) -> str | None:
         try:
-            raw = self._client.chat(_SYSTEM, self._turn_prompt(objective, canary, conversation))
+            raw = self._client.chat(self._system, self._turn_prompt(objective, canary, conversation))
             payload = _clean(raw)
             if not payload:
                 raise LLMUnavailable("empty completion")
@@ -163,6 +168,9 @@ class LLMPayloadOperator:
             return payload
         except LLMUnavailable:
             return self._battery.propose_turn(objective, canary, conversation)
+
+    def agent_for(self, objective: str) -> str:
+        return self.name
 
 
 def build_operator(kind: str, client: Any | None = None) -> Any:

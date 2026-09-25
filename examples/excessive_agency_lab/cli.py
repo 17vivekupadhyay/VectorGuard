@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 
+from agents import OrchestratorOperator
 from engine import CampaignResult, run_campaign
 from llm_client import LLMClient
 from objectives import ALL_OBJECTIVE_IDS, build_objectives
@@ -44,10 +45,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-steps", type=int, default=8, help="Budget per objective.")
     p.add_argument(
         "--operator",
-        choices=["deterministic", "llm"],
+        choices=["deterministic", "llm", "orchestrated"],
         default="deterministic",
-        help="Attacker brain. 'llm' uses an LLM (configure via LLM_BASE_URL / "
-             "LLM_MODEL / LLM_API_KEY) and falls back to deterministic if absent.",
+        help="Attacker brain. 'llm' uses an LLM (LLM_BASE_URL / LLM_MODEL / "
+             "LLM_API_KEY, falls back to deterministic). 'orchestrated' routes each "
+             "objective to specialist sub-agents (multi-agent).",
     )
     p.add_argument("--out", default=None, help="If set, write JSON + Markdown reports here.")
     p.add_argument(
@@ -61,6 +63,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _build_operator(kind: str):
     """Build the requested operator; degrade LLM -> deterministic if unconfigured."""
+    if kind == "orchestrated":
+        print(f"{DIM}[operator] orchestrator routing to specialist sub-agents "
+              f"(social-engineer, injector, protocol){RESET}")
+        return OrchestratorOperator()
     if kind != "llm":
         return DeterministicOperator()
     client = LLMClient.from_env()
@@ -81,17 +87,29 @@ def _targets(name: str) -> list[str]:
     return [name]
 
 
+def _routing_path(result_item) -> str:
+    """Ordered distinct specialists the orchestrator routed through (from the trace)."""
+    seen: list[str] = []
+    for st in result_item.trace:
+        spec = st.tactic.split(":")[0] if ":" in st.tactic else st.tactic
+        if spec not in seen:
+            seen.append(spec)
+    return " -> ".join(seen)
+
+
 def _print_campaign_summary(result: CampaignResult) -> None:
     n, total = result.captured_count, len(result.results)
     head = f"{RED}{BOLD}{n}/{total} objectives EXPLOITED{RESET}" if n else \
         f"{GREEN}{BOLD}all {total} objectives resisted{RESET}"
     print(f"\n{BOLD}── {result.target_profile} ──{RESET}  {head}")
     for r in result.results:
+        path = _routing_path(r)
+        routed = f"  {DIM}[routed: {path}]{RESET}" if "->" in path else ""
         if r.captured:
             print(f"  {RED}EXPLOITED{RESET} {r.tool:<20} via {r.winning_tactic} "
-                  f"(step {r.steps})")
+                  f"(step {r.steps}){routed}")
         else:
-            print(f"  {GREEN}resisted {RESET} {r.tool:<20} ({r.steps} tactics tried)")
+            print(f"  {GREEN}resisted {RESET} {r.tool:<20} ({r.steps} tactics tried){routed}")
 
 
 def main(argv: list[str] | None = None) -> int:
