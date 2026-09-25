@@ -20,6 +20,12 @@ from typing import TYPE_CHECKING, Any
 from vectorguard.reports.summary import build_summary
 
 from .episode import DEFAULT_MAX_STEPS, run_episode
+from .intelligence import (
+    SecurityAssessment,
+    assessment_to_dict,
+    build_assessment,
+    render_assessment_markdown,
+)
 
 if TYPE_CHECKING:
     from vectorguard.targets.base import BaseTarget
@@ -68,6 +74,7 @@ def run_campaign(
 ) -> dict[str, Any]:
     """Run all objectives, build the report, and (optionally) write it to disk."""
     episodes: list[dict[str, Any]] = []
+    campaign_intel: list[str] = []  # recon chained from earlier objectives
     for objective in objectives:
         episode = run_episode(
             target,
@@ -76,11 +83,17 @@ def run_campaign(
             judge=judge,
             analyst=analyst,
             max_steps=max_steps,
+            seed_intel=list(campaign_intel),
         )
         episodes.append(episode)
+        # feed this objective's harvest forward so the next attack can chain it
+        for item in episode.get("captured_intel", []):
+            if item not in campaign_intel:
+                campaign_intel.append(item)
 
     results = [_episode_to_result(ep) for ep in episodes]
     summary = build_summary(results)
+    assessment = build_assessment(episodes)
 
     # Report the strategy that actually drove the attack, not just what was
     # configured: a configured-but-unreachable LLM degrades to deterministic
@@ -96,13 +109,15 @@ def run_campaign(
         "metadata": metadata or {},
         "strategy": effective_strategy,
         "configured_strategy": operator.strategy,
+        "posture": assessment.posture,
         "summary": summary,
         "captured_count": sum(1 for ep in episodes if ep["captured"]),
+        "assessment": assessment_to_dict(assessment),
         "objectives": episodes,
     }
 
     if out_dir is not None:
-        report["report_paths"] = _write_reports(report, out_dir)
+        report["report_paths"] = _write_reports(report, out_dir, assessment)
 
     return report
 
@@ -110,7 +125,9 @@ def run_campaign(
 # ----------------------------------------------------------------- report files
 
 
-def _write_reports(report: dict[str, Any], out_dir: str | Path) -> dict[str, str]:
+def _write_reports(
+    report: dict[str, Any], out_dir: str | Path, assessment: SecurityAssessment
+) -> dict[str, str]:
     directory = Path(out_dir)
     directory.mkdir(parents=True, exist_ok=True)
 
@@ -119,7 +136,7 @@ def _write_reports(report: dict[str, Any], out_dir: str | Path) -> dict[str, str
         json.dump(report, handle, indent=2)
 
     md_path = directory / "report.md"
-    md_path.write_text(_render_markdown(report), encoding="utf-8")
+    md_path.write_text(_render_markdown(report, assessment), encoding="utf-8")
 
     return {"json": str(json_path), "markdown": str(md_path)}
 
@@ -133,7 +150,7 @@ def _render_transcript(transcript: list[dict[str, str]]) -> str:
     return "\n\n".join(lines)
 
 
-def _render_markdown(report: dict[str, Any]) -> str:
+def _render_markdown(report: dict[str, Any], assessment: SecurityAssessment) -> str:
     summary = report["summary"]
     meta = report.get("metadata", {})
     captured = report["captured_count"]
@@ -144,9 +161,13 @@ def _render_markdown(report: dict[str, Any]) -> str:
     out.append(f"- Run: `{report['run_id']}`")
     out.append(f"- Target: `{meta.get('target', 'unknown')}`")
     out.append(f"- Attacker strategy: **{report['strategy']}**")
+    out.append(f"- Security posture: **{assessment.posture}**")
     out.append(f"- Objectives captured: **{captured} / {total}**")
     out.append(f"- Total risk score: **{summary.get('total_risk_score', 0.0)}**")
     out.append("")
+
+    # Lead with analyst-grade intelligence (exec summary, chains, remediation).
+    out.append(render_assessment_markdown(assessment))
 
     out.append("## Coverage\n")
     out.append("| Objective | OWASP | Severity | Status | Method | Steps |")

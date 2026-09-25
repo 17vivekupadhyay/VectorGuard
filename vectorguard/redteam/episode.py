@@ -47,15 +47,20 @@ def run_episode(
     executor: Executor | None = None,
     max_steps: int = DEFAULT_MAX_STEPS,
     no_progress_limit: int = DEFAULT_NO_PROGRESS_LIMIT,
+    seed_intel: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Run the bounded attack loop for one objective and return its result."""
+    """Run the bounded attack loop for one objective and return its result.
+
+    ``seed_intel`` pre-loads reconnaissance harvested by earlier objectives in the
+    same campaign, so the operator can chain a leak from one attack into the next.
+    """
     exec_ = executor or Executor(target)
     analyst_ = analyst or Analyst(client=None)  # deterministic reflection by default
 
     conversation: list[dict[str, str]] = []
     steps: list[dict[str, Any]] = []
     attempted_tactics: list[str] = []
-    captured_intel: list[str] = []
+    captured_intel: list[str] = list(seed_intel or [])
     last_response = ""
     guidance: dict[str, Any] | None = None  # analyst feedback from the prior step
 
