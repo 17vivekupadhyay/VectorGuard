@@ -100,6 +100,23 @@ intel chaining** — recon captured while pursuing one objective (`seed_intel`) 
 carried forward to seed the next, so the campaign compounds what it learns instead
 of starting each objective cold.
 
+**Defense-aware adaptation.** The attacker doesn't just walk a fixed tactic
+ladder — it builds a working theory of the target's defenses and routes around
+them. Each attempt is an experiment: a plaintext ask that gets refused while an
+encoded one slips through is the signature of a *surface keyword filter with no
+decode-stage check*, so the agent stops re-phrasing plaintext and escalates
+straight to encoding. The reasoning is surfaced as a visible trace in the report
+— `action → observation → hypothesis → next move` — so you can watch it adapt:
+
+```
+Step 1 · tried direct → refused → inferred: input keyword filter;
+         escalate to base64_encoding to bypass surface matching
+Step 2 · base64_encoding → captured the flag
+```
+
+Pass `--baseline` to disable the reasoning layer and walk the fixed ladder
+instead — used to measure what the adaptation adds (see Evaluation below).
+
 To point it at your own app, copy `vectorguard/examples/redteam_target.yaml`,
 set `base_url`/`model` to your endpoint, plant your own marker/secret via
 `--system-marker` / `--planted-secret`, and pass your host to `--scope`.
@@ -215,6 +232,39 @@ automation). Black-box findings are signals to triage, not verified verdicts.
 
 ---
 
+## Evaluation (golden set)
+
+Unit tests prove the *code* is correct. The eval harness proves the *tool* is
+good at its job: it runs the attacker + oracle against a **golden set** of
+in-process targets whose vulnerabilities are known by construction (some safe,
+some vulnerable only to an *encoded* attack), compares each verdict to the
+ground-truth label, and reports **precision / recall / F1**. It is fully
+deterministic and key-free, so the number is reproducible on every machine and
+in CI.
+
+```bash
+python -m evals.run_eval            # baseline vs adaptive, side by side
+python -m evals.run_eval --mode adaptive
+```
+
+The headline result — defense-aware adaptation vs the fixed tactic ladder:
+
+| Mode | Precision | Recall | F1 |
+|------|-----------|--------|----|
+| baseline (fixed ladder) | 100% | 67% | 0.80 |
+| **adaptive (defense-aware)** | **100%** | **100%** | **1.00** |
+
+Same oracle, same targets, same budget: reasoning about the target's defenses
+lifts recall from 67% to 100% at no cost to precision — it catches the
+encoding-only vulnerabilities the fixed ladder gives up on. The report also
+lists every **false negative** (a real vuln missed) and **false positive** (a
+safe target flagged), which is the actionable output a change is judged against.
+
+> This measures VectorGuard against targets of *these shapes*; it is a
+> regression and comparison harness, not a claim of real-world coverage.
+
+---
+
 ## Why VectorGuard?
 
 LLM applications can fail in subtle ways:
@@ -279,6 +329,12 @@ listed as planned rather than implied.
   with overall posture, per-finding root cause / business impact / remediation,
   known attack chains, and tactic-effectiveness — all deterministic
 - **Cross-objective intel chaining**: recon captured on one objective seeds the next
+- **Defense-aware adaptation**: the attacker infers the target's defenses from each
+  attempt and routes around them (e.g. encodes past a surface keyword filter),
+  with a visible `action → observation → hypothesis → next` reasoning trace
+- **Golden-set eval harness** (`python -m evals.run_eval`): deterministic
+  precision / recall / F1 against labeled targets, with a baseline-vs-adaptive
+  comparison and false-negative / false-positive lists
 - **Sandbox excessive-agency lab**: a tool-using mock agent that demonstrates
   tricking an agent into an unauthorized action, proven by an inert tool-call
   ledger (`executed: False`)
@@ -352,6 +408,7 @@ examples/
   rag_docs/              # Example clean and poisoned documents
   excessive_agency_lab/  # Sandbox tool-using agent + inert tool-call ledger (LLM06)
 
+evals/           # Golden-set eval harness (labeled fake targets, metrics, runner)
 scripts/         # Helper scripts for running suites
 .github/         # GitHub Actions CI workflow
 ```
