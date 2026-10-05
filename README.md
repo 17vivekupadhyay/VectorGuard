@@ -245,7 +245,7 @@ listed as planned rather than implied.
 | LLM03 | Supply Chain | ⬜ Planned | Out of scope for black-box runtime testing |
 | LLM04 | Data & Model Poisoning | 🟡 Partial | Local RAG scan loads poisoned documents and tests whether the model obeys injected retrieved content |
 | LLM05 | Improper Output Handling | ⬜ Planned | — |
-| LLM06 | Excessive Agency | ⬜ Planned | — |
+| LLM06 | Excessive Agency | 🟡 Partial | Sandbox excessive-agency lab: a tool-using mock agent, with proof-of-effect from an inert tool-call ledger (no runtime check against arbitrary targets yet) |
 | LLM07 | System Prompt Leakage | ✅ Covered | System-prompt-leak detectors + red-team `system_prompt_leak` objective with a planted marker |
 | LLM08 | Vector & Embedding Weaknesses | 🟡 Partial | Retrieval-poisoning signals via local RAG scan mode |
 | LLM09 | Misinformation | ⬜ Planned | — |
