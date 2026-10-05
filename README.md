@@ -332,7 +332,9 @@ vectorguard/
   evaluators/    # Detector logic and pass/fail evaluation
   examples/      # Example target configs and mock chatbots (incl. redteam_mock.py)
   redteam/       # Autonomous LLM red-team agent (objectives, oracle, operator,
-                 #   analyst, episode loop, campaign, CLI)
+                 #   analyst, episode loop, campaign, intelligence layer, CLI)
+  blackbox/      # Point-and-shoot black-box agent (adapter, operator,
+                 #   orchestrator/specialists, oracle, campaign, CLI)
   reports/       # JSON and Markdown report generation
   runner/        # Test loading and execution logic
   storage/       # Local saved reports and run artifacts
@@ -344,7 +346,8 @@ vectorguard/
   rag_scan.py    # Local RAG scan CLI entry point
 
 examples/
-  rag_docs/      # Example clean and poisoned documents
+  rag_docs/              # Example clean and poisoned documents
+  excessive_agency_lab/  # Sandbox tool-using agent + inert tool-call ledger (LLM06)
 
 scripts/         # Helper scripts for running suites
 .github/         # GitHub Actions CI workflow
