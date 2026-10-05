@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any
 from vectorguard.core.scoring import severity_to_score
 
 from .analyst import Analyst
+from .defense import DefenseModel
 from .executor import Executor
 
 if TYPE_CHECKING:
@@ -48,14 +49,21 @@ def run_episode(
     max_steps: int = DEFAULT_MAX_STEPS,
     no_progress_limit: int = DEFAULT_NO_PROGRESS_LIMIT,
     seed_intel: list[str] | None = None,
+    use_defense_model: bool = True,
 ) -> dict[str, Any]:
     """Run the bounded attack loop for one objective and return its result.
 
     ``seed_intel`` pre-loads reconnaissance harvested by earlier objectives in the
     same campaign, so the operator can chain a leak from one attack into the next.
+
+    ``use_defense_model`` turns on defense-aware adaptation: the attacker infers
+    the target's defenses from each attempt and routes around them, instead of
+    walking the fixed tactic ladder. Disable it to get the ladder baseline (used
+    by the eval harness to measure what the reasoning layer adds).
     """
     exec_ = executor or Executor(target)
     analyst_ = analyst or Analyst(client=None)  # deterministic reflection by default
+    defense_model = DefenseModel() if use_defense_model else None
 
     conversation: list[dict[str, str]] = []
     steps: list[dict[str, Any]] = []
@@ -121,6 +129,7 @@ def run_episode(
             response_text=response.text,
             attempted_tactics=attempted_tactics,
             capture=capture,
+            defense_model=defense_model,
         )
         for item in assessment.intel:
             if item not in captured_intel:
@@ -171,6 +180,8 @@ def run_episode(
         "capture_method": final_capture.method if final_capture else "none",
         "proof": final_capture.proof if (final_capture and captured) else "",
         "captured_intel": captured_intel,
+        "defense_profile": defense_model.profile() if defense_model else "",
+        "reasoning_trace": defense_model.trace if defense_model else [],
         "transcript": conversation,
         "steps": steps,
     }

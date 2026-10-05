@@ -21,6 +21,7 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from .defense import DefenseModel
 from .objectives import scan_credentials
 from .operator import _TACTIC_NAMES
 from .prompts import build_analyst_prompt
@@ -123,8 +124,16 @@ class Analyst:
         response_text: str,
         attempted_tactics: list[str],
         capture: CaptureResult,
+        defense_model: DefenseModel | None = None,
     ) -> Assessment:
-        """Return an :class:`Assessment` steering the next attempt."""
+        """Return an :class:`Assessment` steering the next attempt.
+
+        When a ``defense_model`` is supplied, the attacker reasons about the
+        target's defenses: each attempt updates the model, and the deterministic
+        recommendation comes from "which tactic bypasses the inferred defense"
+        rather than the fixed ladder order. The model also records a visible
+        reasoning trace regardless of which path produced the assessment.
+        """
         if self._client is not None:
             llm = self._reflect_with_llm(
                 objective=objective,
@@ -136,12 +145,48 @@ class Analyst:
                 # Always anchor progress to deterministic capture confidence so a
                 # partial deterministic/judge signal is never lost.
                 llm.progress = max(llm.progress, float(capture.confidence))
+                if defense_model is not None:
+                    self._feed_defense_model(
+                        defense_model,
+                        attempted_tactics=attempted_tactics,
+                        response_text=response_text,
+                        capture=capture,
+                        intel=llm.intel,
+                        recommendation=llm.strategy or (llm.recommended_tactic or ""),
+                    )
                 return llm
 
         return self._reflect_deterministic(
             response_text=response_text,
             attempted_tactics=attempted_tactics,
             capture=capture,
+            defense_model=defense_model,
+        )
+
+    @staticmethod
+    def _feed_defense_model(
+        defense_model: DefenseModel,
+        *,
+        attempted_tactics: list[str],
+        response_text: str,
+        capture: CaptureResult,
+        intel: list[str],
+        recommendation: str,
+    ) -> None:
+        """Update the model and record a trace step without steering the LLM path."""
+        tactic = attempted_tactics[-1] if attempted_tactics else "direct"
+        observation = defense_model.observe(
+            tactic=tactic,
+            refused=looks_like_refusal(response_text),
+            captured=bool(capture.captured),
+            progress=float(capture.confidence),
+            intel_found=bool(intel),
+        )
+        defense_model.record(
+            step=len(attempted_tactics),
+            tactic=tactic,
+            observation=observation,
+            recommendation=recommendation or "(LLM-directed next move)",
         )
 
     # ----------------------------------------------------------------- LLM path
@@ -199,6 +244,7 @@ class Analyst:
         response_text: str,
         attempted_tactics: list[str],
         capture: CaptureResult,
+        defense_model: DefenseModel | None = None,
     ) -> Assessment:
         refused = looks_like_refusal(response_text)
         if capture.confidence > 0:
@@ -209,10 +255,37 @@ class Analyst:
             progress = 0.3  # engaged but no proof - some movement
 
         intel = self._extract_intel(response_text)
-
         untried = [name for name in _TACTIC_NAMES if name not in set(attempted_tactics)]
-        recommended = untried[0] if untried else None
 
+        if defense_model is not None:
+            # Defense-aware: let the model learn from this attempt and pick the
+            # tactic that bypasses the inferred defense, not just the next rung.
+            tactic = attempted_tactics[-1] if attempted_tactics else "direct"
+            observation = defense_model.observe(
+                tactic=tactic,
+                refused=refused,
+                captured=bool(capture.captured),
+                progress=progress,
+                intel_found=bool(intel),
+            )
+            recommended, rationale = defense_model.recommend(untried)
+            defense_model.record(
+                step=len(attempted_tactics),
+                tactic=tactic,
+                observation=observation,
+                recommendation=rationale,
+            )
+            strategy = f"{defense_model.profile()} → {rationale}"
+            return Assessment(
+                refused=refused,
+                progress=progress,
+                intel=intel,
+                strategy=strategy,
+                recommended_tactic=recommended,
+                source="deterministic",
+            )
+
+        recommended = untried[0] if untried else None
         if refused:
             strategy = f"Target refused; escalate to {recommended or 'a fresh tactic'}."
         elif intel:
