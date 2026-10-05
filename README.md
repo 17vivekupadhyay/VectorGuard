@@ -171,6 +171,10 @@ vectorguard-blackbox pentest --url http://localhost:8000/chat --scope localhost 
 export LLM_BASE_URL=http://localhost:11434/v1 LLM_MODEL=llama3.1
 vectorguard-blackbox pentest --url http://localhost:8000/chat --scope localhost \
   --operator llm --max-turns 4
+
+# Multi-agent: a coordinator dispatches each objective to a specialist sub-agent
+vectorguard-blackbox pentest --url http://localhost:8000/chat --scope localhost \
+  --operator orchestrated --max-turns 4
 ```
 
 How it proves findings without instrumenting the target — each with an honest
@@ -184,12 +188,23 @@ confidence band:
 | System-prompt leakage (LLM07) | heuristic phrasing | low ("needs review") |
 
 - **Auto-adapter** detects common request shapes (`POST {message}`/`{prompt}`/…, or `GET`).
-- **Two operators**: a deterministic payload battery (key-free) or an optional LLM
-  operator that generates and adapts payloads.
+- **Three operators** (`--operator`): a deterministic payload `battery` (key-free),
+  a single adaptive `llm` operator, or `orchestrated` multi-agent mode.
 - **Single-shot or multi-turn** (`--max-turns > 1`): one evolving conversation that
   primes a premise, then strikes.
 - **Safe by design**: `--scope` is mandatory (target host must match), it is
   talk-only, and secrets are redacted in reports.
+
+**Multi-agent orchestration (`--operator orchestrated`).** Instead of one
+generalist attacker, a **coordinator dispatches each objective to a specialist
+sub-agent** — an LLM primed with a technique-rich system prompt for that
+vulnerability class (an injection expert, a disclosure expert, a system-prompt-leak
+expert, a consumption expert). It is an **orchestrator/worker pattern**: the
+specialists sit behind the same `propose` interface the engine already drives, so
+they wire in without touching the campaign loop. Routing is an explicit
+`{objective → specialist}` dispatch, not emergent collaboration. With no LLM
+configured every specialist degrades to the deterministic battery, so the agent
+still runs key-free.
 
 Works for standard JSON chat APIs; authenticated, websocket/session-based, or
 web-widget-only bots need an explicit `--target` config (there is no browser
