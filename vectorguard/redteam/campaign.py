@@ -71,6 +71,7 @@ def run_campaign(
     max_steps: int = DEFAULT_MAX_STEPS,
     out_dir: str | Path | None = None,
     metadata: dict[str, Any] | None = None,
+    use_defense_model: bool = True,
 ) -> dict[str, Any]:
     """Run all objectives, build the report, and (optionally) write it to disk."""
     episodes: list[dict[str, Any]] = []
@@ -84,6 +85,7 @@ def run_campaign(
             analyst=analyst,
             max_steps=max_steps,
             seed_intel=list(campaign_intel),
+            use_defense_model=use_defense_model,
         )
         episodes.append(episode)
         # feed this objective's harvest forward so the next attack can chain it
@@ -150,6 +152,23 @@ def _render_transcript(transcript: list[dict[str, str]]) -> str:
     return "\n\n".join(lines)
 
 
+def _render_reasoning(ep: dict[str, Any]) -> str:
+    """Show the attacker thinking: action -> observation -> hypothesis -> next move."""
+    trace = ep.get("reasoning_trace") or []
+    if not trace:
+        return ""
+    lines = ["**Attacker reasoning trace:**\n"]
+    profile = ep.get("defense_profile")
+    if profile:
+        lines.append(f"> Inferred defenses: _{profile}_\n")
+    for rec in trace:
+        lines.append(
+            f"- **Step {rec['step']}** · tried `{rec['action']}` → observed "
+            f"*{rec['observation']}* → next: {rec['next']}"
+        )
+    return "\n".join(lines) + "\n"
+
+
 def _render_markdown(report: dict[str, Any], assessment: SecurityAssessment) -> str:
     summary = report["summary"]
     meta = report.get("metadata", {})
@@ -191,6 +210,9 @@ def _render_markdown(report: dict[str, Any], assessment: SecurityAssessment) -> 
             out.append(f"- Evidence: {ep['evidence']}")
             out.append(f"- Proof held: `{ep['proof']}`")
             out.append(f"- Captured in {ep['steps_taken']} step(s) via tactic escalation.\n")
+            reasoning = _render_reasoning(ep)
+            if reasoning:
+                out.append(reasoning)
             out.append("**Reproduction transcript:**\n")
             out.append(_render_transcript(ep["transcript"]))
             out.append("")
@@ -203,6 +225,10 @@ def _render_markdown(report: dict[str, Any], assessment: SecurityAssessment) -> 
                 f"- **{ep['objective_id']}** ({ep['owasp_id']}): "
                 f"{ep['stopped_reason']} after {ep['steps_taken']} step(s)."
             )
+            reasoning = _render_reasoning(ep)
+            if reasoning:
+                out.append("")
+                out.append(reasoning)
         out.append("")
 
     return "\n".join(out)

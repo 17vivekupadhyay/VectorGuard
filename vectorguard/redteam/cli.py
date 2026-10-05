@@ -122,6 +122,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Exit 1 if any objective is captured",
     )
+    attack.add_argument(
+        "--baseline",
+        action="store_true",
+        help="Disable defense-aware adaptation (walk the fixed tactic ladder). "
+        "Used to measure what the reasoning layer adds.",
+    )
 
     # Planted flags / budgets (what you placed in the target you are testing).
     attack.add_argument("--system-marker", default=DEFAULT_SYSTEM_MARKER)
@@ -223,6 +229,7 @@ def _run_attack(args: argparse.Namespace) -> int:
         max_steps=args.max_steps,
         out_dir=args.out,
         metadata=metadata,
+        use_defense_model=not args.baseline,
     )
 
     _print_summary(report, use_color=not args.no_color)
