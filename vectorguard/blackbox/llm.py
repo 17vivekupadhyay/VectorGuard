@@ -30,18 +30,23 @@ class LLMClient:
         *,
         timeout: float = 60.0,
         temperature: float = 1.0,
+        seed: int | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key = api_key
         self.timeout = timeout
         self.temperature = temperature
+        # Reproducibility: with temperature=0 (and, where the provider honors it,
+        # a fixed seed) repeated runs produce the same payloads — required for a
+        # stable eval. Defaults keep the attacker varied; set via from_env.
+        self.seed = seed
 
     def chat(self, system: str, user: str) -> str:
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        body = {
+        body: dict = {
             "model": self.model,
             "temperature": self.temperature,
             "messages": [
@@ -49,6 +54,8 @@ class LLMClient:
                 {"role": "user", "content": user},
             ],
         }
+        if self.seed is not None:
+            body["seed"] = self.seed
         try:
             resp = httpx.post(f"{self.base_url}/chat/completions", json=body,
                               headers=headers, timeout=self.timeout)
@@ -68,4 +75,20 @@ class LLMClient:
                or os.environ.get("VG_API_KEY"))
         if not base or not model:
             return None
-        return cls(base, model, key)
+        # LLM_TEMPERATURE / LLM_SEED make runs reproducible for eval; both default
+        # to the varied-attacker behavior when unset or unparseable.
+        temperature = 1.0
+        raw_temp = os.environ.get("LLM_TEMPERATURE")
+        if raw_temp is not None:
+            try:
+                temperature = float(raw_temp)
+            except ValueError:
+                pass
+        seed: int | None = None
+        raw_seed = os.environ.get("LLM_SEED")
+        if raw_seed is not None:
+            try:
+                seed = int(raw_seed)
+            except ValueError:
+                pass
+        return cls(base, model, key, temperature=temperature, seed=seed)
