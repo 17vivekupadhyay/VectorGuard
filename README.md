@@ -194,6 +194,9 @@ confidence band:
   primes a premise, then strikes.
 - **Safe by design**: `--scope` is mandatory (target host must match), it is
   talk-only, and secrets are redacted in reports.
+- **Reproducible runs**: the LLM operator defaults to a varied attacker, but
+  `LLM_TEMPERATURE=0` (and, where the provider honors it, `LLM_SEED`) makes
+  repeated runs emit identical payloads — needed for a stable eval.
 
 **Multi-agent orchestration (`--operator orchestrated`).** Instead of one
 generalist attacker, a **coordinator dispatches each objective to a specialist
