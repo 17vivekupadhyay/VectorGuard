@@ -55,6 +55,16 @@ suite under `tests/` (run with `pytest -q`) plus CI integration smoke tests that
 boot a Flask mock and assert exit codes. CI (`.github/workflows/ci.yml`) runs
 `ruff check`, the pytest suite, and the smoke tests on every push and PR.
 
+Beyond the core LLM/RAG pipeline, the package now includes an autonomous
+red-team agent with an analyst-grade intelligence layer (`vectorguard/redteam/`,
+objectives → operator → oracle → analyst → campaign → `SecurityAssessment`), a
+point-and-shoot black-box agent with multi-agent orchestration
+(`vectorguard/blackbox/`, `--operator orchestrated` dispatches each objective to
+a specialist sub-agent), and a sandbox excessive-agency lab
+(`examples/excessive_agency_lab/`, inert mock tools proven via a tool-call
+ledger). All keep the same safety contract: the LLM plans and generates;
+deterministic Python executes and judges capture.
+
 Core LLM/RAG pipeline (do not break):
 
 ```
