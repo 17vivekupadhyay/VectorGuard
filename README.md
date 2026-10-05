@@ -251,17 +251,21 @@ The headline result — defense-aware adaptation vs the fixed tactic ladder:
 
 | Mode | Precision | Recall | F1 |
 |------|-----------|--------|----|
-| baseline (fixed ladder) | 100% | 67% | 0.80 |
-| **adaptive (defense-aware)** | **100%** | **100%** | **1.00** |
+| baseline (fixed ladder) | 100% | 50% | 0.67 |
+| **adaptive (defense-aware)** | **100%** | **75%** | **0.86** |
 
 Same oracle, same targets, same budget: reasoning about the target's defenses
-lifts recall from 67% to 100% at no cost to precision — it catches the
-encoding-only vulnerabilities the fixed ladder gives up on. The report also
-lists every **false negative** (a real vuln missed) and **false positive** (a
-safe target flagged), which is the actionable output a change is judged against.
+lifts recall from 50% to 75% at no cost to precision — it catches the
+encoding-only vulnerabilities the fixed ladder gives up on. Adaptive does **not**
+score a perfect 100%: the set deliberately includes targets vulnerable only to an
+encoding the attacker's ladder doesn't produce (ROT13 / hex), which stay honest
+false negatives for both modes. The report lists every **false negative** (a real
+vuln missed — here, a missing obfuscation tactic) and **false positive** (a safe
+target flagged), which is the actionable output a change is judged against.
 
 > This measures VectorGuard against targets of *these shapes*; it is a
-> regression and comparison harness, not a claim of real-world coverage.
+> regression and comparison harness, not a claim of real-world coverage. The
+> headroom is intentional — a benchmark its own tool aces reveals nothing.
 
 ---
 
@@ -334,7 +338,8 @@ listed as planned rather than implied.
   with a visible `action → observation → hypothesis → next` reasoning trace
 - **Golden-set eval harness** (`python -m evals.run_eval`): deterministic
   precision / recall / F1 against labeled targets, with a baseline-vs-adaptive
-  comparison and false-negative / false-positive lists
+  comparison (recall 50% → 75% at 100% precision) and false-negative /
+  false-positive lists
 - **Sandbox excessive-agency lab**: a tool-using mock agent that demonstrates
   tricking an agent into an unauthorized action, proven by an inert tool-call
   ledger (`executed: False`)
