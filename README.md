@@ -83,6 +83,23 @@ reproduction transcript. Use `--fail-on-capture` to exit non-zero in CI when any
 objective is captured, and `--objectives system_prompt_leak,credential_exfil` to
 scope the run.
 
+**Analyst-grade intelligence layer.** A campaign is more than a list of raw
+captures. After the objectives run, VectorGuard builds a **`SecurityAssessment`**
+that the report leads with:
+
+- an **overall posture** rolled up from the worst confirmed findings;
+- per-finding **root cause, business impact, and concrete remediation** (a curated
+  defensive playbook keyed by objective — deterministic, not model-invented);
+- **attack chains** — known escalation pairs where one finding amplifies another
+  (e.g. system-prompt leakage feeding a sharper injection);
+- **tactic effectiveness** — which escalation rungs actually landed.
+
+The assessment is deterministic: the LLM never writes the remediation guidance, so
+the report says the same thing every run. Findings also feed **cross-objective
+intel chaining** — recon captured while pursuing one objective (`seed_intel`) is
+carried forward to seed the next, so the campaign compounds what it learns instead
+of starting each objective cold.
+
 To point it at your own app, copy `vectorguard/examples/redteam_target.yaml`,
 set `base_url`/`model` to your endpoint, plant your own marker/secret via
 `--system-marker` / `--planted-secret`, and pass your host to `--scope`.
