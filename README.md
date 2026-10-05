@@ -269,6 +269,16 @@ listed as planned rather than implied.
   - safe-by-default: talk-only, scope-locked, bounded step/size caps
   - runs key-free with deterministic operator + analyst fallback
   - exploit reports with full reproduction transcripts
+- **Multi-agent orchestration** (black-box `--operator orchestrated`): a
+  coordinator dispatches each objective to a specialist sub-agent per
+  vulnerability class, degrading to the deterministic battery with no LLM
+- **Analyst-grade intelligence layer**: campaigns roll up to a `SecurityAssessment`
+  with overall posture, per-finding root cause / business impact / remediation,
+  known attack chains, and tactic-effectiveness — all deterministic
+- **Cross-objective intel chaining**: recon captured on one objective seeds the next
+- **Sandbox excessive-agency lab**: a tool-using mock agent that demonstrates
+  tricking an agent into an unauthorized action, proven by an inert tool-call
+  ledger (`executed: False`)
 - YAML-based security test suites
 - OpenAI-compatible target adapter
 - Generic HTTP chatbot/API target adapter
