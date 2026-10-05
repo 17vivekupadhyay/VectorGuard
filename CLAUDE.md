@@ -46,9 +46,14 @@ or destructive tests.
 
 ## Current Architecture Summary
 
-VectorGuard is a dependency-light Python package run via `python -m`. There is
-no packaging/entry-point config; "tests" today are CI integration smoke tests
-that boot a Flask mock and assert exit codes.
+VectorGuard is a dependency-light Python package. It is packaged via
+`pyproject.toml` (setuptools, v2.0.0) and installs console entry points —
+`vectorguard`, `vectorguard-web`, `vectorguard-redteam`, `vectorguard-rag`, and
+`vectorguard-blackbox` — via `pip install -e ".[dev]"`; the `python -m
+vectorguard.*` invocations still work. Testing is two layered: a `pytest` unit
+suite under `tests/` (run with `pytest -q`) plus CI integration smoke tests that
+boot a Flask mock and assert exit codes. CI (`.github/workflows/ci.yml`) runs
+`ruff check`, the pytest suite, and the smoke tests on every push and PR.
 
 Core LLM/RAG pipeline (do not break):
 
